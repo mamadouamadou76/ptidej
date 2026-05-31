@@ -1,0 +1,94 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "Public user profile indicating their active team",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "description": "The unique user authentication ID" },
+        "displayName": { "type": "string", "description": "User visible display name" },
+        "photoURL": { "type": "string", "format": "uri", "description": "User profile avatar url" },
+        "activeTeamId": { "type": "string", "description": "ID of the current active team being viewed/managed" }
+      },
+      "required": ["uid", "displayName"]
+    },
+    "UserPrivate": {
+      "title": "UserPrivate",
+      "description": "Private Isolated user details for PII security standards",
+      "type": "object",
+      "properties": {
+        "email": { "type": "string", "format": "email", "description": "Private email address of user" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Private signup timestamp" }
+      },
+      "required": ["email"]
+    },
+    "Team": {
+      "title": "Team",
+      "description": "A work shift team sharing a breakfast planning cycle",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "description": "User defined team name" },
+        "ownerId": { "type": "string", "description": "UID of the team creator" },
+        "settings": {
+          "type": "object",
+          "description": "Dynamic shift settings of the rotation"
+        },
+        "overrides": {
+          "type": "object",
+          "description": "Manual overrides map of dateString to colleagueId"
+        },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Creation timestamp" },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Last changed timestamp" }
+      },
+      "required": ["name", "ownerId", "settings", "overrides"]
+    },
+    "Colleague": {
+      "title": "Colleague",
+      "description": "Active team members eligible to bring breakfast",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Local colleague ID" },
+        "name": { "type": "string", "description": "Display name of colleague" },
+        "color": { "type": "string", "description": "Id color theme" },
+        "isActive": { "type": "boolean", "description": "Active status in team rotation" },
+        "initialCount": { "type": "integer", "description": "Adjustable metric multiplier for fairness" }
+      },
+      "required": ["id", "name", "color", "isActive", "initialCount"]
+    },
+    "Absence": {
+      "title": "Absence",
+      "description": "Planned vacation or rest periods",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Absence entry ID" },
+        "colleagueId": { "type": "string", "description": "Reference ID matching the colleague" },
+        "startDate": { "type": "string", "format": "date", "description": "YYYY-MM-DD start" },
+        "endDate": { "type": "string", "format": "date", "description": "YYYY-MM-DD end (inclusive)" },
+        "reason": { "type": "string", "description": "Vacation, illness, RTT, etc." }
+      },
+      "required": ["id", "colleagueId", "startDate", "endDate"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}/public/profile": {
+      "schema": "UserProfile",
+      "description": "Public user profile maps"
+    },
+    "/users/{userId}/private/info": {
+      "schema": "UserPrivate",
+      "description": "Private isolated user records"
+    },
+    "/teams/{teamId}": {
+      "schema": "Team",
+      "description": "Team definitions and override configs"
+    },
+    "/teams/{teamId}/colleagues/{colleagueId}": {
+      "schema": "Colleague",
+      "description": "Team colleagues list for rotation scoring"
+    },
+    "/teams/{teamId}/absences/{absenceId}": {
+      "schema": "Absence",
+      "description": "Calendar absences for shift team"
+    }
+  }
+}

@@ -1,0 +1,6 @@
+{
+  "name": "Planning Petit Déjeuner",
+  "description": "Planificateur automatique de petits déjeuners pour les équipes de quart du matin, avec gestion des absences et prévisions sur 6 semaines.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
