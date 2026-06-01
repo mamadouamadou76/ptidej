@@ -26,6 +26,7 @@ export default function App() {
     startWeekDate: '',
     workDays: [1, 2, 3, 4, 5],
     morningWeeks: [true, true, true, true, true, true],
+    numberOfWeeks: 6, // Default to 6 weeks
   });
   const [overrides, setOverrides] = useState<ManualOverride>({});
 
@@ -112,14 +113,19 @@ function AppContent({
       if (storedColleagues && storedSettings) {
         setColleagues(JSON.parse(storedColleagues));
         setAbsences(storedAbsences ? JSON.parse(storedAbsences) : []);
-        setSettings(JSON.parse(storedSettings));
+        const parsedSettings = JSON.parse(storedSettings);
+        // Ensure numberOfWeeks is present for backwards compatibility
+        if (!parsedSettings.numberOfWeeks) {
+          parsedSettings.numberOfWeeks = 6;
+        }
+        setSettings(parsedSettings);
         setOverrides(storedOverrides ? JSON.parse(storedOverrides) : {});
       } else {
         // Fallback to beautiful built-in French demo data so the app doesn't look empty!
         const demo = getInitialDemoData();
         setColleagues(demo.colleagues);
         setAbsences(demo.absences);
-        setSettings(demo.settings);
+        setSettings({ ...demo.settings, numberOfWeeks: 6 });
         setOverrides({});
       }
     } catch (e) {
@@ -127,7 +133,8 @@ function AppContent({
       const demo = getInitialDemoData();
       setColleagues(demo.colleagues);
       setAbsences(demo.absences);
-      setSettings(demo.settings);
+      setSettings({ ...demo.settings, numberOfWeeks: 6 });
+      setOverrides({});
     }
     setIsLoaded(true);
   }, [setColleagues, setAbsences, setSettings, setOverrides]);
@@ -296,6 +303,7 @@ function AppContent({
         startWeekDate: startMondayStr,
         workDays: [1, 2, 3, 4, 5],
         morningWeeks: [true, true, true, true, true, true],
+        numberOfWeeks: 6,
       });
     }
   };

@@ -20,17 +20,44 @@ export function SettingsView({
   onClearAll,
 }: SettingsViewProps) {
   
-  // List of weeks helper
-  const weekLabels = [
-    'Semaine 1 (Début)',
-    'Semaine 2',
-    'Semaine 3',
-    'Semaine 4',
-    'Semaine 5',
-    'Semaine 6',
-  ];
+  // List of weeks helper (dynamic based on settings.numberOfWeeks)
+  const weekLabels = Array.from({ length: settings.numberOfWeeks }, (_, i) => `Semaine ${i + 1}`);
 
-  // Workdays helper
+  // Handle number of weeks modification
+  const handleNumberOfWeeksChange = (num: number) => {
+    if (num < 1 || num > 12) return; // Limit between 1 and 12 weeks for now
+    onUpdateSettings({
+      ...settings,
+      numberOfWeeks: num,
+      // Adjust morningWeeks array size if needed
+      morningWeeks: settings.morningWeeks.slice(0, num).concat(Array(Math.max(0, num - settings.morningWeeks.length)).fill(true))
+    });
+  };
+
+  return (
+    <div className="flex-1 overflow-y-auto p-4 space-y-5">
+      {/* Nombre de semaines à programmer */}
+      <div className="bg-white border border-stone-200/80 p-4 rounded-2xl shadow-xs space-y-3">
+        <h3 className="font-bold text-stone-900 text-sm flex items-center gap-2">
+          <Calendar className="w-4 h-4 text-amber-600" />
+          <span>Nombre de semaines à programmer</span>
+        </h3>
+        <p className="text-xs text-stone-500">
+          Définissez le nombre de semaines pour lesquelles le planning doit être généré (entre 1 et 12).
+        </p>
+        <div className="relative">
+          <input
+            type="number"
+            id="number-of-weeks-input"
+            value={settings.numberOfWeeks}
+            onChange={(e) => handleNumberOfWeeksChange(parseInt(e.target.value))}
+            className="w-full px-3.5 py-2 rounded-xl text-sm border border-stone-200 outline-none focus:border-amber-500 bg-stone-50/50 font-mono"
+            min="1"
+            max="12"
+          />
+        </div>
+      </div>
+      {/* Date de départ */}
   const DAYS_LIST = [
     { value: 1, label: 'Lundi' },
     { value: 2, label: 'Mardi' },

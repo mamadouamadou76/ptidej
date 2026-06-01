@@ -59,9 +59,10 @@ export function generateSchedule(
 ): CalendarDay[] {
   const calendar: CalendarDay[] = [];
   const startMonday = parseLocalDate(settings.startWeekDate);
+  const totalDays = settings.numberOfWeeks * 7;
 
-  // We generate 42 days (6 weeks)
-  for (let i = 0; i < 42; i++) {
+  // We generate totalDays
+  for (let i = 0; i < totalDays; i++) {
     const currentDate = new Date(startMonday);
     currentDate.setDate(startMonday.getDate() + i);
     const dateStr = formatLocalDate(currentDate);

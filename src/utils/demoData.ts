@@ -50,6 +50,7 @@ export function getInitialDemoData(): {
     startWeekDate: mondayStr,
     workDays: [1, 2, 3, 4, 5], // Lundi à Vendredi
     morningWeeks: [true, true, false, true, true, false], // Semaines 1, 2, 4, 5 en Matin
+    numberOfWeeks: 6, // Default to 6 weeks
   };
 
   return { colleagues, absences, settings };

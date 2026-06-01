@@ -24,9 +24,10 @@ export function PlanningView({
   const [editingDate, setEditingDate] = useState<string | null>(null);
   const [copiedText, setCopiedText] = useState(false);
 
-  // Group schedule by weekIndex (0 to 5)
+  // Group schedule by weekIndex (dynamic based on schedule length)
+  const maxWeekIndex = Math.max(...schedule.map(d => d.weekIndex), 0);
   const weeks: CalendarDay[][] = [];
-  for (let i = 0; i < 6; i++) {
+  for (let i = 0; i <= maxWeekIndex; i++) {
     weeks.push(schedule.filter((day) => day.weekIndex === i));
   }
 
@@ -45,7 +46,8 @@ export function PlanningView({
 
   // Generate plain text summary for easy coffee-room copying
   const handleCopySummary = () => {
-    let summary = `☕ *PLANNING PETITS DÉJEUNERS (6 SEMAINES)* 🥐\n`;
+    const numWeeks = Math.max(...schedule.map(d => d.weekIndex), 0) + 1;
+    let summary = `☕ *PLANNING PETITS DÉJEUNERS (${numWeeks} SEMAINES)* 🥐\n`;
     const start = new Date(schedule[0].date);
     const end = new Date(schedule[schedule.length - 1].date);
     summary += `Période : du Lundi ${start.toLocaleDateString('fr-FR')} au Dimanche ${end.toLocaleDateString('fr-FR')}\n\n`;
@@ -84,7 +86,7 @@ export function PlanningView({
       {/* Top Banner Toolbar */}
       <div className="px-4 py-3 bg-white border-b border-stone-200/80 flex justify-between items-center z-10 shadow-3xs">
         <div>
-          <h2 className="font-bold text-stone-900 text-sm">Prévisions 6 semaines</h2>
+          <h2 className="font-bold text-stone-900 text-sm">Prévisions {weeks.length} semaines</h2>
           <p className="text-[10px] text-stone-500 font-medium">Cycle recalculé à chaque modification</p>
         </div>
 

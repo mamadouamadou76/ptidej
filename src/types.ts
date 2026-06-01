@@ -22,7 +22,8 @@ export interface Absence {
 export interface ShiftSettings {
   startWeekDate: string; // YYYY-MM-DD (typically a Monday)
   workDays: number[]; // 1 = Mon, 2 = Tue, ..., 7 = Sun
-  morningWeeks: boolean[]; // 6 booleans indicating if week 0 to 5 is a morning shift
+  morningWeeks: boolean[]; // N booleans indicating if week 0 to N-1 is a morning shift
+  numberOfWeeks: number; // Number of weeks to schedule
 }
 
 export interface CalendarDay {
