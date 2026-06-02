@@ -7,6 +7,7 @@ import React, { useState, useEffect } from 'react';
 import { Colleague, Absence, ShiftSettings, ManualOverride, CalendarDay } from './types';
 import { MobileFrame } from './components/MobileFrame';
 import { PlanningView } from './components/PlanningView';
+import { DesktopPlanningView } from './components/DesktopPlanningView';
 import { ColleaguesView } from './components/ColleaguesView';
 import { SettingsView } from './components/SettingsView';
 import { AuthView } from './components/AuthView';
@@ -74,6 +75,18 @@ function AppContent({
 }: AppContentProps) {
   // Navigation Tabs state
   const [activeTab, setActiveTab] = useState<'planning' | 'colleagues' | 'settings'>('planning');
+
+  // Desktop detection
+  const [isDesktop, setIsDesktop] = useState(window.innerWidth >= 1024);
+
+  // Listen to window resize for responsive view switching
+  useEffect(() => {
+    const handleResize = () => {
+      setIsDesktop(window.innerWidth >= 1024);
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   // Firebase auth state and functions
   const { 
@@ -337,47 +350,59 @@ function AppContent({
   const needsTeamSetup = user && !activeTeamId;
 
   return (
-    <MobileFrame>
+    <MobileFrame fullWidth={isDesktop}>
       {/* App Header */}
-      <div className="bg-white border-b border-stone-200 px-4 py-3 flex items-center justify-between z-10 select-none shadow-xs">
-        <div className="flex items-center gap-2">
+      <div className={`bg-white border-b border-stone-200 flex items-center justify-between z-10 select-none shadow-xs transition-all ${
+        isDesktop ? 'px-6 py-4' : 'px-4 py-3'
+      }`}>
+        <div className="flex items-center gap-3">
           <div className="bg-amber-500 text-white p-1.5 rounded-xl flex items-center justify-center shadow-xs">
-            <Coffee className="w-4 h-4 fill-current" />
+            <Coffee className={`fill-current ${isDesktop ? 'w-5 h-5' : 'w-4 h-4'}`} />
           </div>
           <div>
-            <h1 className="font-sans font-extrabold text-sm.5 tracking-tight text-stone-900 leading-none">
+            <h1 className={`font-sans font-extrabold tracking-tight text-stone-900 leading-none ${
+              isDesktop ? 'text-lg' : 'text-sm.5'
+            }`}>
               P'tit Déj Matinal 🥐
             </h1>
-            <span className="text-[9px] font-mono text-amber-700 font-bold uppercase tracking-wider">
-              {activeTeamId ? `Sync Cloud - ${teamName}` : "Mode Local Autonome"}
+            <span className={`font-mono font-bold uppercase tracking-wider text-amber-700 ${
+              isDesktop ? 'text-xs' : 'text-[9px]'
+            }`}>
+              {activeTeamId ? `Sync Cloud - ${teamName}` : "Mode Local"}
             </span>
           </div>
         </div>
 
         {/* Sync / Authentication Status Indicator */}
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-2">
           {activeTeamId ? (
             <button
               onClick={() => setShowTeamPanel(true)}
-              className="flex items-center gap-1.5 text-[10px] font-bold px-3 py-1.5 rounded-xl border bg-emerald-50 text-emerald-800 border-emerald-200 shadow-3xs active:scale-95 transition-all text-left max-w-[130px] truncate"
+              className={`flex items-center gap-1.5 font-bold rounded-lg border bg-emerald-50 text-emerald-800 border-emerald-200 shadow-3xs active:scale-95 transition-all text-left max-w-[150px] truncate ${
+                isDesktop ? 'text-xs px-4 py-2' : 'text-[10px] px-3 py-1.5 rounded-xl'
+              }`}
             >
-              <Cloud className="w-3.5 h-3.5 text-emerald-600 animate-pulse" />
+              <Cloud className="w-3.5 h-3.5 text-emerald-600 animate-pulse flex-shrink-0" />
               <span className="truncate">{teamName || "Équipe"}</span>
             </button>
           ) : user ? (
             <button
               onClick={() => setShowTeamPanel(true)}
-              className="flex items-center gap-1.5 text-[10px] font-bold px-3 py-1.5 rounded-xl border bg-amber-50 text-amber-800 border-amber-200 shadow-3xs active:scale-95 transition-all"
+              className={`flex items-center gap-1.5 font-bold rounded-lg border bg-amber-50 text-amber-800 border-amber-200 shadow-3xs active:scale-95 transition-all ${
+                isDesktop ? 'text-xs px-4 py-2' : 'text-[10px] px-3 py-1.5 rounded-xl'
+              }`}
             >
-              <CloudOff className="w-3.5 h-3.5 text-amber-600" />
+              <CloudOff className="w-3.5 h-3.5 text-amber-600 flex-shrink-0" />
               <span>Sans Équipe</span>
             </button>
           ) : (
             <button
               onClick={() => setShowAuthModal(true)}
-              className="flex items-center gap-1.5 text-[10px] font-bold px-3 py-1.5 rounded-xl border border-stone-200 bg-white text-stone-700 hover:bg-stone-50 transition-all select-none active:scale-95 hover:border-amber-400"
+              className={`flex items-center gap-1.5 font-bold rounded-lg border border-stone-200 bg-white text-stone-700 hover:bg-stone-50 transition-all select-none active:scale-95 hover:border-amber-400 ${
+                isDesktop ? 'text-xs px-4 py-2' : 'text-[10px] px-3 py-1.5 rounded-xl'
+              }`}
             >
-              <Cloud className="w-3.5 h-3.5 text-stone-400" />
+              <Cloud className="w-3.5 h-3.5 text-stone-400 flex-shrink-0" />
               <span>S'enregistrer</span>
             </button>
           )}
@@ -398,13 +423,25 @@ function AppContent({
         ) : (
           <>
             {activeTab === 'planning' && (
-              <PlanningView
-                schedule={schedule}
-                colleagues={colleagues}
-                onSetOverride={handleSetOverride}
-                onClearOverride={handleClearOverride}
-                startWeekDate={settings.startWeekDate}
-              />
+              isDesktop ? (
+                <DesktopPlanningView
+                  schedule={schedule}
+                  colleagues={colleagues}
+                  onSetOverride={handleSetOverride}
+                  onClearOverride={handleClearOverride}
+                  startWeekDate={settings.startWeekDate}
+                  numberOfWeeks={settings.numberOfWeeks}
+                />
+              ) : (
+                <PlanningView
+                  schedule={schedule}
+                  colleagues={colleagues}
+                  onSetOverride={handleSetOverride}
+                  onClearOverride={handleClearOverride}
+                  startWeekDate={settings.startWeekDate}
+                  numberOfWeeks={settings.numberOfWeeks}
+                />
+              )
             )}
 
             {activeTab === 'colleagues' && (
@@ -432,37 +469,47 @@ function AppContent({
         )}
       </div>
 
-      {/* App Bottom Navigation Bar */}
+      {/* App Bottom Navigation Bar (Mobile) / Top Navigation Bar (Desktop) */}
       {!needsTeamSetup && !showAuthModal && (
-        <div className="h-16 bg-white border-t border-stone-200 grid grid-cols-3 z-10 shadow-lg select-none">
+        <div className={`bg-white border-stone-200 z-10 shadow-lg select-none ${
+          isDesktop 
+            ? 'border-b px-6 py-3 flex items-center gap-4'
+            : 'h-16 border-t grid grid-cols-3'
+        }`}>
           <button
             onClick={() => setActiveTab('planning')}
-            className={`flex flex-col items-center justify-center gap-1 transition-all ${
-              activeTab === 'planning' ? 'text-amber-600' : 'text-stone-400 hover:text-stone-600'
+            className={`flex items-center gap-2 transition-all font-bold text-sm ${
+              isDesktop 
+                ? `px-4 py-2 rounded-lg ${activeTab === 'planning' ? 'bg-amber-100 text-amber-700 border border-amber-200' : 'text-stone-600 hover:text-amber-600'}`
+                : `flex-col gap-1 ${activeTab === 'planning' ? 'text-amber-600' : 'text-stone-400 hover:text-stone-600'}`
             }`}
           >
-            <Calendar className={`w-5 h-5 ${activeTab === 'planning' ? 'stroke-[2.5]' : 'stroke-2'}`} />
-            <span className="text-[10px] font-bold">Calendrier</span>
+            <Calendar className={`${isDesktop ? 'w-4 h-4' : 'w-5 h-5'} ${activeTab === 'planning' ? 'stroke-[2.5]' : 'stroke-2'}`} />
+            {isDesktop ? 'Calendrier' : <span className="text-[10px] font-bold">Calendrier</span>}
           </button>
 
           <button
             onClick={() => setActiveTab('colleagues')}
-            className={`flex flex-col items-center justify-center gap-1 transition-all ${
-              activeTab === 'colleagues' ? 'text-amber-600' : 'text-stone-400 hover:text-stone-600'
+            className={`flex items-center gap-2 transition-all font-bold text-sm ${
+              isDesktop 
+                ? `px-4 py-2 rounded-lg ${activeTab === 'colleagues' ? 'bg-amber-100 text-amber-700 border border-amber-200' : 'text-stone-600 hover:text-amber-600'}`
+                : `flex-col gap-1 ${activeTab === 'colleagues' ? 'text-amber-600' : 'text-stone-400 hover:text-stone-600'}`
             }`}
           >
-            <Users className={`w-5 h-5 ${activeTab === 'colleagues' ? 'stroke-[2.5]' : 'stroke-2'}`} />
-            <span className="text-[10px] font-bold">Équipe/Abs</span>
+            <Users className={`${isDesktop ? 'w-4 h-4' : 'w-5 h-5'} ${activeTab === 'colleagues' ? 'stroke-[2.5]' : 'stroke-2'}`} />
+            {isDesktop ? 'Équipe & Absences' : <span className="text-[10px] font-bold">Équipe/Abs</span>}
           </button>
 
           <button
             onClick={() => setActiveTab('settings')}
-            className={`flex flex-col items-center justify-center gap-1 transition-all ${
-              activeTab === 'settings' ? 'text-amber-600' : 'text-stone-400 hover:text-stone-600'
+            className={`flex items-center gap-2 transition-all font-bold text-sm ${
+              isDesktop 
+                ? `px-4 py-2 rounded-lg ${activeTab === 'settings' ? 'bg-amber-100 text-amber-700 border border-amber-200' : 'text-stone-600 hover:text-amber-600'}`
+                : `flex-col gap-1 ${activeTab === 'settings' ? 'text-amber-600' : 'text-stone-400 hover:text-stone-600'}`
             }`}
           >
-            <Settings className={`w-5 h-5 ${activeTab === 'settings' ? 'stroke-[2.5]' : 'stroke-2'}`} />
-            <span className="text-[10px] font-bold">Réglages</span>
+            <Settings className={`${isDesktop ? 'w-4 h-4' : 'w-5 h-5'} ${activeTab === 'settings' ? 'stroke-[2.5]' : 'stroke-2'}`} />
+            {isDesktop ? 'Paramètres' : <span className="text-[10px] font-bold">Réglages</span>}
           </button>
         </div>
       )}

@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
 import { CalendarDay, Colleague, ManualOverride } from '../types';
 import { getColors } from '../utils/colorMapper';
+import { exportPlanningToExcel } from '../utils/excelExport';
+import { getISOWeekNumber } from '../utils/scheduler';
 import { 
   Coffee, Share2, Check, AlertTriangle, ChevronDown, RefreshCw, 
-  User, Calendar, Landmark, Info, CalendarOff, Smile, Copy, CheckCircle
+  User, Calendar, Landmark, Info, CalendarOff, Smile, Copy, CheckCircle, FileDown
 } from 'lucide-react';
 
 interface PlanningViewProps {
@@ -12,6 +14,7 @@ interface PlanningViewProps {
   onSetOverride: (dateString: string, colleagueId: string | null) => void;
   onClearOverride: (dateString: string) => void;
   startWeekDate: string;
+  numberOfWeeks: number;
 }
 
 export function PlanningView({
@@ -20,9 +23,11 @@ export function PlanningView({
   onSetOverride,
   onClearOverride,
   startWeekDate,
+  numberOfWeeks,
 }: PlanningViewProps) {
   const [editingDate, setEditingDate] = useState<string | null>(null);
   const [copiedText, setCopiedText] = useState(false);
+  const [exportedExcel, setExportedExcel] = useState(false);
 
   // Group schedule by weekIndex (dynamic based on schedule length)
   const maxWeekIndex = Math.max(...schedule.map(d => d.weekIndex), 0);
@@ -57,7 +62,8 @@ export function PlanningView({
       const weekMonday = new Date(weekDays[0]?.date);
       const formattedMon = weekMonday.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' });
       
-      summary += `*Semaine ${wIdx + 1} (du ${formattedMon})* : ${
+      const weekNum = getISOWeekNumber(weekMonday);
+      summary += `*Semaine ${weekNum} (du ${formattedMon})* : ${
         isMorning ? '🌞 Matin' : '💤 Repos / Autre poste (Pas de p\'tit déj)'
       }\n`;
 
@@ -81,6 +87,13 @@ export function PlanningView({
     setTimeout(() => setCopiedText(false), 2500);
   };
 
+  // Export to Excel
+  const handleExportExcel = () => {
+    exportPlanningToExcel(schedule, colleagues, numberOfWeeks, startWeekDate);
+    setExportedExcel(true);
+    setTimeout(() => setExportedExcel(false), 2500);
+  };
+
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
       {/* Top Banner Toolbar */}
@@ -90,27 +103,51 @@ export function PlanningView({
           <p className="text-[10px] text-stone-500 font-medium">Cycle recalculé à chaque modification</p>
         </div>
 
-        <button
-          id="btn-copy-summary"
-          onClick={handleCopySummary}
-          className={`flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold rounded-xl shadow-xs transition-all ${
-            copiedText
-              ? 'bg-emerald-600 text-white'
-              : 'bg-amber-500 hover:bg-amber-600 text-white'
-          }`}
-        >
-          {copiedText ? (
-            <>
-              <Check className="w-3.5 h-3.5" />
-              <span>Copié dans le presse-pap !</span>
-            </>
-          ) : (
-            <>
-              <Share2 className="w-3.5 h-3.5" />
-              <span>Exporter WhatsApp / Slack</span>
-            </>
-          )}
-        </button>
+        <div className="flex gap-2">
+          <button
+            id="btn-copy-summary"
+            onClick={handleCopySummary}
+            className={`flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold rounded-xl shadow-xs transition-all ${
+              copiedText
+                ? 'bg-emerald-600 text-white'
+                : 'bg-amber-500 hover:bg-amber-600 text-white'
+            }`}
+          >
+            {copiedText ? (
+              <>
+                <Check className="w-3.5 h-3.5" />
+                <span>Copié dans le presse-pap !</span>
+              </>
+            ) : (
+              <>
+                <Share2 className="w-3.5 h-3.5" />
+                <span>Exporter WhatsApp / Slack</span>
+              </>
+            )}
+          </button>
+
+          <button
+            id="btn-export-excel"
+            onClick={handleExportExcel}
+            className={`flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold rounded-xl shadow-xs transition-all ${
+              exportedExcel
+                ? 'bg-emerald-600 text-white'
+                : 'bg-blue-500 hover:bg-blue-600 text-white'
+            }`}
+          >
+            {exportedExcel ? (
+              <>
+                <Check className="w-3.5 h-3.5" />
+                <span>Téléchargé !</span>
+              </>
+            ) : (
+              <>
+                <FileDown className="w-3.5 h-3.5" />
+                <span>Télécharger Excel</span>
+              </>
+            )}
+          </button>
+        </div>
       </div>
 
       {/* Main lists scrollable container */}
@@ -119,6 +156,7 @@ export function PlanningView({
           const isMorning = weekDays[0]?.isMorningShift;
           const weekMonday = new Date(weekDays[0]?.date);
           const formattedMon = weekMonday.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' });
+          const isoWeek = getISOWeekNumber(weekMonday);
 
           return (
             <div
@@ -138,12 +176,8 @@ export function PlanningView({
                 }`}
               >
                 <div>
-                  <h4 className="font-bold text-stone-900 text-xs tracking-tight">
-                    Semaine {wIdx + 1}
-                  </h4>
-                  <span className="text-[10px] text-stone-500 font-mono">
-                    Débute le Lun. {formattedMon}
-                  </span>
+                  <span className="text-xs font-bold text-stone-700">Semaine {isoWeek}</span>
+                  <span className="text-[11px] text-stone-500 font-mono ml-1.5">— Lun. {formattedMon}</span>
                 </div>
 
                 <span

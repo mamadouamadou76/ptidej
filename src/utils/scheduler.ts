@@ -19,6 +19,17 @@ export function formatLocalDate(date: Date): string {
 }
 
 /**
+ * Returns the ISO 8601 week number for a given date.
+ */
+export function getISOWeekNumber(date: Date): number {
+  const d = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  const day = d.getDay() || 7; // Make Sunday = 7
+  d.setDate(d.getDate() + 4 - day); // Move to nearest Thursday
+  const yearStart = new Date(d.getFullYear(), 0, 1);
+  return Math.ceil((((d.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
+}
+
+/**
  * Helper to get the Monday of the week for any given date.
  */
 export function getMonday(date: Date): Date {

@@ -3,9 +3,10 @@ import { Coffee, Smartphone, Download, Check, Info, Share, HelpCircle, Laptop } 
 
 interface MobileFrameProps {
   children: React.ReactNode;
+  fullWidth?: boolean;
 }
 
-export function MobileFrame({ children }: MobileFrameProps) {
+export function MobileFrame({ children, fullWidth = false }: MobileFrameProps) {
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const [isInstalled, setIsInstalled] = useState<boolean>(false);
   const [showInstallGuide, setShowInstallGuide] = useState<boolean>(false);
@@ -49,7 +50,7 @@ export function MobileFrame({ children }: MobileFrameProps) {
       <div className="fixed inset-0 bg-radial from-amber-50/30 via-stone-50/10 to-stone-100/10 -z-10 pointer-events-none" />
 
       {/* Main Container: Full viewport on mobile, Centered elegantly on desktop for maximum comfort */}
-      <div className="w-full max-w-lg md:max-w-2xl min-h-screen bg-white shadow-xl md:shadow-2xl md:border-x border-stone-200/65 flex flex-col relative overflow-hidden">
+      <div className={`w-full ${fullWidth ? 'max-w-full' : 'max-w-lg md:max-w-2xl'} min-h-screen bg-white shadow-xl md:shadow-2xl md:border-x border-stone-200/65 flex flex-col relative overflow-hidden`}>
         
         {/* PWA Direct Installation Ribbon bar if available and not installed yet */}
         {!isInstalled && (

@@ -4,7 +4,7 @@ import {
   Calendar, RotateCcw, Check, RefreshCw, AlertTriangle, 
   HelpCircle, Sparkles, Clock, Hammer
 } from 'lucide-react';
-import { getMonday, formatLocalDate } from '../utils/scheduler';
+import { getMonday, formatLocalDate, getISOWeekNumber } from '../utils/scheduler';
 
 interface SettingsViewProps {
   settings: ShiftSettings;
@@ -20,8 +20,12 @@ export function SettingsView({
   onClearAll,
 }: SettingsViewProps) {
   
-  // List of weeks helper (dynamic based on settings.numberOfWeeks)
-  const weekLabels = Array.from({ length: settings.numberOfWeeks }, (_, i) => `Semaine ${i + 1}`);
+  // Compute the Monday date and ISO week number for each week in the cycle
+  const weekMetas = Array.from({ length: settings.numberOfWeeks }, (_, i) => {
+    const monday = new Date(settings.startWeekDate);
+    monday.setDate(monday.getDate() + i * 7);
+    return { monday, isoWeek: getISOWeekNumber(monday) };
+  });
 
   // Handle number of weeks modification
   const handleNumberOfWeeksChange = (num: number) => {
@@ -34,30 +38,7 @@ export function SettingsView({
     });
   };
 
-  return (
-    <div className="flex-1 overflow-y-auto p-4 space-y-5">
-      {/* Nombre de semaines à programmer */}
-      <div className="bg-white border border-stone-200/80 p-4 rounded-2xl shadow-xs space-y-3">
-        <h3 className="font-bold text-stone-900 text-sm flex items-center gap-2">
-          <Calendar className="w-4 h-4 text-amber-600" />
-          <span>Nombre de semaines à programmer</span>
-        </h3>
-        <p className="text-xs text-stone-500">
-          Définissez le nombre de semaines pour lesquelles le planning doit être généré (entre 1 et 12).
-        </p>
-        <div className="relative">
-          <input
-            type="number"
-            id="number-of-weeks-input"
-            value={settings.numberOfWeeks}
-            onChange={(e) => handleNumberOfWeeksChange(parseInt(e.target.value))}
-            className="w-full px-3.5 py-2 rounded-xl text-sm border border-stone-200 outline-none focus:border-amber-500 bg-stone-50/50 font-mono"
-            min="1"
-            max="12"
-          />
-        </div>
-      </div>
-      {/* Date de départ */}
+  // Workdays helper
   const DAYS_LIST = [
     { value: 1, label: 'Lundi' },
     { value: 2, label: 'Mardi' },
@@ -110,8 +91,56 @@ export function SettingsView({
     });
   };
 
+  // Quick presets for morning weeks
+  type WeekPreset = 'all' | 'odd' | 'even';
+
+  const getActivePreset = (): WeekPreset | null => {
+    const { morningWeeks, numberOfWeeks } = settings;
+    const allTrue = morningWeeks.slice(0, numberOfWeeks).every((v) => v);
+    const oddOnly = morningWeeks.slice(0, numberOfWeeks).every((v, i) => v === (i % 2 === 0));
+    const evenOnly = morningWeeks.slice(0, numberOfWeeks).every((v, i) => v === (i % 2 === 1));
+    if (allTrue) return 'all';
+    if (oddOnly) return 'odd';
+    if (evenOnly) return 'even';
+    return null;
+  };
+
+  const handleApplyPreset = (preset: WeekPreset) => {
+    const updatedMorningWeeks = Array.from({ length: settings.numberOfWeeks }, (_, i) => {
+      if (preset === 'all') return true;
+      if (preset === 'odd') return i % 2 === 0; // Semaine 1, 3, 5... (index 0, 2, 4...)
+      if (preset === 'even') return i % 2 === 1; // Semaine 2, 4, 6... (index 1, 3, 5...)
+      return true;
+    });
+    onUpdateSettings({ ...settings, morningWeeks: updatedMorningWeeks });
+  };
+
+  const activePreset = getActivePreset();
+
   return (
     <div className="flex-1 overflow-y-auto p-4 space-y-5">
+      {/* Nombre de semaines à programmer */}
+      <div className="bg-white border border-stone-200/80 p-4 rounded-2xl shadow-xs space-y-3">
+        <h3 className="font-bold text-stone-900 text-sm flex items-center gap-2">
+          <Calendar className="w-4 h-4 text-amber-600" />
+          <span>Nombre de semaines à programmer</span>
+        </h3>
+        <p className="text-xs text-stone-500">
+          Définissez le nombre de semaines pour lesquelles le planning doit être généré (entre 1 et 12).
+        </p>
+        <div className="relative">
+          <input
+            type="number"
+            id="number-of-weeks-input"
+            value={settings.numberOfWeeks}
+            onChange={(e) => handleNumberOfWeeksChange(parseInt(e.target.value))}
+            className="w-full px-3.5 py-2 rounded-xl text-sm border border-stone-200 outline-none focus:border-amber-500 bg-stone-50/50 font-mono"
+            min="1"
+            max="12"
+          />
+        </div>
+      </div>
+
       {/* Date de départ */}
       <div className="bg-white border border-stone-200/80 p-4 rounded-2xl shadow-xs space-y-3">
         <h3 className="font-bold text-stone-900 text-sm flex items-center gap-2">
@@ -119,7 +148,7 @@ export function SettingsView({
           <span>Date de début du cycle</span>
         </h3>
         <p className="text-xs text-stone-500">
-          Choisissez la date de démarrage de vos prévisions sur 6 semaines. La date sera automatiquement calée sur le Lundi de la semaine sélectionnée.
+          Choisissez la date de démarrage de vos prévisions sur {settings.numberOfWeeks} semaines. La date sera automatiquement calée sur le Lundi de la semaine sélectionnée.
         </p>
         <div className="relative">
           <input
@@ -182,15 +211,30 @@ export function SettingsView({
         <p className="text-xs text-stone-500">
           Cochez les semaines où votre sous-équipe est d'équipe "Matin". Les semaines décochées n'auront aucune planification (Repos ou autre poste).
         </p>
+        <div className="grid grid-cols-3 gap-1.5 pt-1">
+          {([
+            { preset: 'odd' as const, label: 'Sem. impaires', sub: '1, 3, 5…' },
+            { preset: 'even' as const, label: 'Sem. paires', sub: '2, 4, 6…' },
+            { preset: 'all' as const, label: 'Toutes', sub: '1, 2, 3…' },
+          ]).map(({ preset, label, sub }) => (
+            <button
+              key={preset}
+              onClick={() => handleApplyPreset(preset)}
+              className={`flex flex-col items-center justify-center gap-0.5 p-2 rounded-xl border text-[11px] font-semibold transition-all ${
+                activePreset === preset
+                  ? 'border-amber-500 bg-amber-50 text-amber-900'
+                  : 'border-stone-200 bg-stone-50 text-stone-500 hover:border-amber-300 hover:bg-amber-50/30 hover:text-stone-700'
+              }`}
+            >
+              <span>{label}</span>
+              <span className={`text-[10px] font-mono font-normal ${activePreset === preset ? 'text-amber-600' : 'text-stone-400'}`}>{sub}</span>
+            </button>
+          ))}
+        </div>
         <div className="space-y-2 pt-1">
-          {weekLabels.map((label, index) => {
+          {weekMetas.map(({ monday, isoWeek }, index) => {
             const isMorning = settings.morningWeeks[index];
-            const weekMonday = new Date(settings.startWeekDate);
-            weekMonday.setDate(weekMonday.getDate() + index * 7);
-            const dateStr = weekMonday.toLocaleDateString('fr-FR', {
-              day: 'numeric',
-              month: 'short',
-            });
+            const dateStr = monday.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' });
 
             return (
               <button
@@ -204,9 +248,9 @@ export function SettingsView({
                 }`}
               >
                 <div className="flex flex-col items-start gap-0.5">
-                  <span>{label}</span>
+                  <span>Semaine {isoWeek}</span>
                   <span className={`text-[10px] font-mono ${isMorning ? 'text-amber-700/80' : 'text-stone-400'}`}>
-                    Semaine du {dateStr}
+                    Du {dateStr}
                   </span>
                 </div>
                 <div className={`w-5 h-5 rounded-md flex items-center justify-center border transition-all ${
