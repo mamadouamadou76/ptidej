@@ -4,14 +4,14 @@
   "description": "Planificateur automatique de petits déjeuners pour les équipes de quart du matin, avec gestion des absences et prévisions sur 6 semaines.",
   "icons": [
     {
-      "src": "https://img.icons8.com/emoji/192/000000/croissant.png",
-      "type": "image/png",
+      "src": "/icon-192.svg",
+      "type": "image/svg+xml",
       "sizes": "192x192",
-      "purpose": "any maskable"
+      "purpose": "any"
     },
     {
-      "src": "https://img.icons8.com/emoji/512/000000/croissant.png",
-      "type": "image/png",
+      "src": "/icon-512.svg",
+      "type": "image/svg+xml",
       "sizes": "512x512",
       "purpose": "any maskable"
     }

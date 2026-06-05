@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Colleague, Absence, ShiftSettings, ManualOverride, CalendarDay } from './types';
 import { MobileFrame } from './components/MobileFrame';
 import { PlanningView } from './components/PlanningView';
@@ -17,7 +17,7 @@ import { generateSchedule, computeStats, getISOWeekNumber } from './utils/schedu
 import { getInitialDemoData } from './utils/demoData';
 import {
   Coffee, Calendar, Users, Settings, Cloud, CloudOff,
-  Copy, Check, Share2
+  Copy, Check, Share2, LayoutGrid
 } from 'lucide-react';
 
 export default function App() {
@@ -74,6 +74,7 @@ function AppContent({
   setOverrides
 }: AppContentProps) {
   const [activeTab, setActiveTab] = useState<'planning' | 'colleagues' | 'settings'>('planning');
+  const [showNav, setShowNav] = useState(true);
   const [isDesktop, setIsDesktop] = useState(window.innerWidth >= 1024);
 
   useEffect(() => {
@@ -81,6 +82,21 @@ function AppContent({
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
+
+  const [autoRecalculate, setAutoRecalculate] = useState(true);
+  const [pendingRecalculate, setPendingRecalculate] = useState(false);
+  const cachedScheduleRef = useRef<CalendarDay[]>([]);
+
+  // Mark pending when data changes while auto-recalc is disabled
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (!autoRecalculate) setPendingRecalculate(true);
+  }, [colleagues, absences, settings, overrides]);
+
+  // Clear pending when auto-recalc is re-enabled
+  useEffect(() => {
+    if (autoRecalculate) setPendingRecalculate(false);
+  }, [autoRecalculate]);
 
   const {
     user,
@@ -267,7 +283,15 @@ function AppContent({
     );
   }
 
-  const schedule = generateSchedule(colleagues, absences, settings, overrides);
+  const handleForceRecalculate = () => {
+    cachedScheduleRef.current = generateSchedule(colleagues, absences, settings, overrides);
+    setPendingRecalculate(false);
+  };
+
+  if (autoRecalculate) {
+    cachedScheduleRef.current = generateSchedule(colleagues, absences, settings, overrides);
+  }
+  const schedule = cachedScheduleRef.current;
   const stats = computeStats(colleagues, schedule);
   const needsTeamSetup = user && !activeTeamId;
 
@@ -330,7 +354,23 @@ ${profile?.displayName || 'L\'équipe'}
 --
 Planning généré le ${dateAujourdhui} via P'tit Déj Matinal 🥐`;
 
-    navigator.clipboard.writeText(email);
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+  navigator.clipboard.writeText(email).catch(() => {
+    const ta = document.createElement('textarea');
+    ta.value = email;
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+  });
+} else {
+  const ta = document.createElement('textarea');
+  ta.value = email;
+  document.body.appendChild(ta);
+  ta.select();
+  document.execCommand('copy');
+  document.body.removeChild(ta);
+}
     setCopiedText(true);
     setTimeout(() => setCopiedText(false), 2500);
   };
@@ -631,6 +671,12 @@ Planning généré le ${dateAujourdhui} via P'tit Déj Matinal 🥐`;
               </span>
             )}
           </div>
+          <button
+            onClick={() => setShowNav(v => !v)}
+            className="p-1.5 rounded-lg text-stone-400 hover:text-stone-700 hover:bg-stone-100 active:scale-95 transition-all"
+          >
+            <LayoutGrid className="w-4 h-4" />
+          </button>
         </div>
 
         <div className="flex items-center gap-2">
@@ -662,6 +708,32 @@ Planning généré le ${dateAujourdhui} via P'tit Déj Matinal 🥐`;
         </div>
       </div>
 
+      {!needsTeamSetup && !showAuthModal && showNav && (
+        <div className="bg-white border-b border-stone-200 z-10 select-none h-12 grid grid-cols-3">
+          <button
+            onClick={() => setActiveTab('planning')}
+            className={`flex items-center flex-col gap-0.5 transition-all font-bold ${activeTab === 'planning' ? 'text-amber-600' : 'text-stone-400'}`}
+          >
+            <Calendar className={`w-4 h-4 ${activeTab === 'planning' ? 'stroke-[2.5]' : 'stroke-2'}`} />
+            <span className="text-[10px] font-bold">Calendrier</span>
+          </button>
+          <button
+            onClick={() => setActiveTab('colleagues')}
+            className={`flex items-center flex-col gap-0.5 transition-all font-bold ${activeTab === 'colleagues' ? 'text-amber-600' : 'text-stone-400'}`}
+          >
+            <Users className={`w-4 h-4 ${activeTab === 'colleagues' ? 'stroke-[2.5]' : 'stroke-2'}`} />
+            <span className="text-[10px] font-bold">Équipe/Abs</span>
+          </button>
+          <button
+            onClick={() => setActiveTab('settings')}
+            className={`flex items-center flex-col gap-0.5 transition-all font-bold ${activeTab === 'settings' ? 'text-amber-600' : 'text-stone-400'}`}
+          >
+            <Settings className={`w-4 h-4 ${activeTab === 'settings' ? 'stroke-[2.5]' : 'stroke-2'}`} />
+            <span className="text-[10px] font-bold">Réglages</span>
+          </button>
+        </div>
+      )}
+
       <div className="flex-1 flex flex-col overflow-hidden bg-[#FAF8F5]">
         {needsTeamSetup ? (
           <TeamMgmtView
@@ -685,6 +757,10 @@ Planning généré le ${dateAujourdhui} via P'tit Déj Matinal 🥐`;
                 onCopySummary={handleCopySummary}
                 coApporteurs={coApporteurs}
                 setCoApporteurs={setCoApporteurs}
+                autoRecalculate={autoRecalculate}
+                onToggleAutoRecalculate={setAutoRecalculate}
+                pendingRecalculate={pendingRecalculate}
+                onForceRecalculate={handleForceRecalculate}
               />
             )}
             {activeTab === 'colleagues' && (
@@ -711,31 +787,6 @@ Planning généré le ${dateAujourdhui} via P'tit Déj Matinal 🥐`;
         )}
       </div>
 
-      {!needsTeamSetup && !showAuthModal && (
-        <div className="bg-white border-stone-200 z-10 shadow-lg select-none h-16 border-t grid grid-cols-3">
-          <button
-            onClick={() => setActiveTab('planning')}
-            className={`flex items-center flex-col gap-1 transition-all font-bold ${activeTab === 'planning' ? 'text-amber-600' : 'text-stone-400'}`}
-          >
-            <Calendar className={`w-5 h-5 ${activeTab === 'planning' ? 'stroke-[2.5]' : 'stroke-2'}`} />
-            <span className="text-[10px] font-bold">Calendrier</span>
-          </button>
-          <button
-            onClick={() => setActiveTab('colleagues')}
-            className={`flex items-center flex-col gap-1 transition-all font-bold ${activeTab === 'colleagues' ? 'text-amber-600' : 'text-stone-400'}`}
-          >
-            <Users className={`w-5 h-5 ${activeTab === 'colleagues' ? 'stroke-[2.5]' : 'stroke-2'}`} />
-            <span className="text-[10px] font-bold">Équipe/Abs</span>
-          </button>
-          <button
-            onClick={() => setActiveTab('settings')}
-            className={`flex items-center flex-col gap-1 transition-all font-bold ${activeTab === 'settings' ? 'text-amber-600' : 'text-stone-400'}`}
-          >
-            <Settings className={`w-5 h-5 ${activeTab === 'settings' ? 'stroke-[2.5]' : 'stroke-2'}`} />
-            <span className="text-[10px] font-bold">Réglages</span>
-          </button>
-        </div>
-      )}
 
       {showTeamPanel && (
         <div className="fixed inset-0 bg-stone-900/50 backdrop-blur-3xs z-50 flex items-end justify-center select-none">

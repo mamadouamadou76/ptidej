@@ -17,6 +17,10 @@ interface PlanningViewProps {
   onCopySummary: () => void;
   coApporteurs: Record<string, string>;
   setCoApporteurs: React.Dispatch<React.SetStateAction<Record<string, string>>>;
+  autoRecalculate: boolean;
+  onToggleAutoRecalculate: (value: boolean) => void;
+  pendingRecalculate: boolean;
+  onForceRecalculate: () => void;
 }
 
 export function PlanningView({
@@ -29,9 +33,23 @@ export function PlanningView({
   onCopySummary,
   coApporteurs,
   setCoApporteurs,
+  autoRecalculate,
+  onToggleAutoRecalculate,
+  pendingRecalculate,
+  onForceRecalculate,
 }: PlanningViewProps) {
   const [editingDate, setEditingDate] = useState<string | null>(null);
   const [copiedText, setCopiedText] = useState(false);
+  const [collapsedWeeks, setCollapsedWeeks] = useState<Set<number>>(new Set());
+
+  const toggleWeek = (wIdx: number) => {
+    setCollapsedWeeks(prev => {
+      const next = new Set(prev);
+      if (next.has(wIdx)) next.delete(wIdx);
+      else next.add(wIdx);
+      return next;
+    });
+  };
 
   // Group schedule by weekIndex, keep only morning-shift weeks
   const maxWeekIndex = Math.max(...schedule.map(d => d.weekIndex), 0);
@@ -60,7 +78,30 @@ export function PlanningView({
       <div className="px-4 py-3 bg-white border-b border-stone-200/80 flex justify-between items-center z-10 shadow-3xs">
         <div>
           <h2 className="font-bold text-stone-900 text-sm">Prévisions {weeks.length} semaines</h2>
-          <p className="text-[10px] text-stone-500 font-medium">Cycle recalculé à chaque modification</p>
+          <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+            <span className="text-[10px] text-stone-500 font-medium">Recalcul auto</span>
+            <button
+              onClick={() => onToggleAutoRecalculate(!autoRecalculate)}
+              className={`relative inline-flex h-4 w-8 items-center rounded-full transition-colors flex-shrink-0 ${
+                autoRecalculate ? 'bg-amber-500' : 'bg-stone-300'
+              }`}
+            >
+              <span
+                className={`inline-block h-3 w-3 transform rounded-full bg-white shadow-sm transition-transform ${
+                  autoRecalculate ? 'translate-x-4' : 'translate-x-0.5'
+                }`}
+              />
+            </button>
+            {!autoRecalculate && pendingRecalculate && (
+              <button
+                onClick={onForceRecalculate}
+                className="flex items-center gap-1 px-2.5 py-1 text-[10px] font-bold rounded-lg bg-orange-500 text-white hover:bg-orange-600 active:scale-95 transition-all"
+              >
+                <RefreshCw className="w-3 h-3" />
+                Recalculer maintenant
+              </button>
+            )}
+          </div>
         </div>
 
         <div className="flex gap-2">
@@ -94,6 +135,20 @@ export function PlanningView({
 
       {/* Main lists scrollable container */}
       <div className="flex-1 overflow-y-auto p-4 space-y-5">
+        <div className="flex justify-end gap-3">
+          <button
+            onClick={() => setCollapsedWeeks(new Set(weeks.map((_, i) => i)))}
+            className="text-[10px] text-stone-400 hover:text-stone-600 font-medium transition-colors"
+          >
+            Tout réduire
+          </button>
+          <button
+            onClick={() => setCollapsedWeeks(new Set())}
+            className="text-[10px] text-stone-400 hover:text-stone-600 font-medium transition-colors"
+          >
+            Tout développer
+          </button>
+        </div>
         {weeks.map((weekDays, wIdx) => {
           const weekMonday = new Date(weekDays[0]?.date);
           const formattedMon = weekMonday.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' });
@@ -105,18 +160,27 @@ export function PlanningView({
               className="border rounded-2xl overflow-hidden transition-colors border-amber-100 bg-white shadow-3xs"
             >
               {/* Week header banner */}
-              <div className="px-4 py-3 border-b flex justify-between items-center bg-amber-500/10 border-amber-100">
+              <div
+                className="px-4 py-3 border-b flex justify-between items-center bg-amber-500/10 border-amber-100 cursor-pointer"
+                onClick={() => toggleWeek(wIdx)}
+              >
                 <div>
                   <span className="text-xs font-bold text-stone-700">Semaine {isoWeek}</span>
                   <span className="text-[11px] text-stone-500 font-mono ml-1.5">— Lun. {formattedMon}</span>
                 </div>
-                <span className="text-[10px] font-bold px-2 py-1 rounded-lg flex items-center gap-1 border bg-amber-500/15 text-amber-900 border-amber-200">
-                  <Coffee className="w-3.5 h-3.5 text-amber-600" />
-                  <span>🌞 Matin</span>
-                </span>
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] font-bold px-2 py-1 rounded-lg flex items-center gap-1 border bg-amber-500/15 text-amber-900 border-amber-200">
+                    <Coffee className="w-3.5 h-3.5 text-amber-600" />
+                    <span>🌞 Matin</span>
+                  </span>
+                  <ChevronDown
+                    className={`w-4 h-4 text-amber-700 transition-transform duration-200 ${collapsedWeeks.has(wIdx) ? 'rotate-180' : ''}`}
+                  />
+                </div>
               </div>
 
               {/* Days inside the week */}
+              {!collapsedWeeks.has(wIdx) && (
               <div className="divide-y divide-stone-150">
                 {weekDays
                   .filter((day) => day.isWorkDay)
@@ -294,6 +358,7 @@ export function PlanningView({
                       );
                     })}
               </div>
+              )}
             </div>
           );
         })}
