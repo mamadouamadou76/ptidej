@@ -682,6 +682,9 @@ Planning généré le ${dateAujourdhui} via P'tit Déj Matinal 🥐`;
                 onClearOverride={handleClearOverride}
                 startWeekDate={settings.startWeekDate}
                 numberOfWeeks={settings.numberOfWeeks}
+                onCopySummary={handleCopySummary}
+                coApporteurs={coApporteurs}
+                setCoApporteurs={setCoApporteurs}
               />
             )}
             {activeTab === 'colleagues' && (

@@ -1,11 +1,10 @@
 import React, { useState } from 'react';
-import { CalendarDay, Colleague, ManualOverride } from '../types';
+import { CalendarDay, Colleague } from '../types';
 import { getColors } from '../utils/colorMapper';
-import { exportPlanningToExcel } from '../utils/excelExport';
 import { getISOWeekNumber } from '../utils/scheduler';
-import { 
-  Coffee, Share2, Check, AlertTriangle, ChevronDown, RefreshCw, 
-  User, Calendar, Landmark, Info, CalendarOff, Smile, Copy, CheckCircle, FileDown
+import {
+  Coffee, Share2, Check, AlertTriangle, ChevronDown, RefreshCw,
+  CalendarOff
 } from 'lucide-react';
 
 interface PlanningViewProps {
@@ -15,6 +14,9 @@ interface PlanningViewProps {
   onClearOverride: (dateString: string) => void;
   startWeekDate: string;
   numberOfWeeks: number;
+  onCopySummary: () => void;
+  coApporteurs: Record<string, string>;
+  setCoApporteurs: React.Dispatch<React.SetStateAction<Record<string, string>>>;
 }
 
 export function PlanningView({
@@ -24,17 +26,20 @@ export function PlanningView({
   onClearOverride,
   startWeekDate,
   numberOfWeeks,
+  onCopySummary,
+  coApporteurs,
+  setCoApporteurs,
 }: PlanningViewProps) {
   const [editingDate, setEditingDate] = useState<string | null>(null);
   const [copiedText, setCopiedText] = useState(false);
-  const [exportedExcel, setExportedExcel] = useState(false);
 
-  // Group schedule by weekIndex (dynamic based on schedule length)
+  // Group schedule by weekIndex, keep only morning-shift weeks
   const maxWeekIndex = Math.max(...schedule.map(d => d.weekIndex), 0);
-  const weeks: CalendarDay[][] = [];
+  const allWeeks: CalendarDay[][] = [];
   for (let i = 0; i <= maxWeekIndex; i++) {
-    weeks.push(schedule.filter((day) => day.weekIndex === i));
+    allWeeks.push(schedule.filter((day) => day.weekIndex === i));
   }
+  const weeks = allWeeks.filter(w => w[0]?.isMorningShift);
 
   // Quick formatter to display day names in French
   const getDayLabelFr = (dayOfWeek: number) => {
@@ -49,51 +54,6 @@ export function PlanningView({
     });
   };
 
-  // Generate plain text summary for easy coffee-room copying
-  const handleCopySummary = () => {
-    const numWeeks = Math.max(...schedule.map(d => d.weekIndex), 0) + 1;
-    let summary = `☕ *PLANNING PETITS DÉJEUNERS (${numWeeks} SEMAINES)* 🥐\n`;
-    const start = new Date(schedule[0].date);
-    const end = new Date(schedule[schedule.length - 1].date);
-    summary += `Période : du Lundi ${start.toLocaleDateString('fr-FR')} au Dimanche ${end.toLocaleDateString('fr-FR')}\n\n`;
-
-    weeks.forEach((weekDays, wIdx) => {
-      const isMorning = weekDays[0]?.isMorningShift;
-      const weekMonday = new Date(weekDays[0]?.date);
-      const formattedMon = weekMonday.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' });
-      
-      const weekNum = getISOWeekNumber(weekMonday);
-      summary += `*Semaine ${weekNum} (du ${formattedMon})* : ${
-        isMorning ? '🌞 Matin' : '💤 Repos / Autre poste (Pas de p\'tit déj)'
-      }\n`;
-
-      if (isMorning) {
-        weekDays.forEach((day) => {
-          if (day.isWorkDay) {
-            const dayName = getDayLabelFr(day.dayOfWeek);
-            const dateNum = day.date.toLocaleDateString('fr-FR', { day: 'numeric', month: '2-digit' });
-            const name = day.colleagueName || '⚠️ Aucun volontairepo';
-            summary += `  - ${dayName} ${dateNum} : *${name}* ${day.isManualOverride ? '✍️' : '🔄'}\n`;
-          }
-        });
-      }
-      summary += `\n`;
-    });
-
-    summary += `_Généré automatiquement par Planning Petit Déj._`;
-
-    navigator.clipboard.writeText(summary);
-    setCopiedText(true);
-    setTimeout(() => setCopiedText(false), 2500);
-  };
-
-  // Export to Excel
-  const handleExportExcel = () => {
-    exportPlanningToExcel(schedule, colleagues, numberOfWeeks, startWeekDate);
-    setExportedExcel(true);
-    setTimeout(() => setExportedExcel(false), 2500);
-  };
-
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
       {/* Top Banner Toolbar */}
@@ -106,7 +66,11 @@ export function PlanningView({
         <div className="flex gap-2">
           <button
             id="btn-copy-summary"
-            onClick={handleCopySummary}
+            onClick={() => {
+              onCopySummary();
+              setCopiedText(true);
+              setTimeout(() => setCopiedText(false), 2500);
+            }}
             className={`flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold rounded-xl shadow-xs transition-all ${
               copiedText
                 ? 'bg-emerald-600 text-white'
@@ -116,34 +80,12 @@ export function PlanningView({
             {copiedText ? (
               <>
                 <Check className="w-3.5 h-3.5" />
-                <span>Copié dans le presse-pap !</span>
+                <span>Copié !</span>
               </>
             ) : (
               <>
                 <Share2 className="w-3.5 h-3.5" />
-                <span>Exporter WhatsApp / Slack</span>
-              </>
-            )}
-          </button>
-
-          <button
-            id="btn-export-excel"
-            onClick={handleExportExcel}
-            className={`flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold rounded-xl shadow-xs transition-all ${
-              exportedExcel
-                ? 'bg-emerald-600 text-white'
-                : 'bg-blue-500 hover:bg-blue-600 text-white'
-            }`}
-          >
-            {exportedExcel ? (
-              <>
-                <Check className="w-3.5 h-3.5" />
-                <span>Téléchargé !</span>
-              </>
-            ) : (
-              <>
-                <FileDown className="w-3.5 h-3.5" />
-                <span>Télécharger Excel</span>
+                <span>Copier résumé</span>
               </>
             )}
           </button>
@@ -153,7 +95,6 @@ export function PlanningView({
       {/* Main lists scrollable container */}
       <div className="flex-1 overflow-y-auto p-4 space-y-5">
         {weeks.map((weekDays, wIdx) => {
-          const isMorning = weekDays[0]?.isMorningShift;
           const weekMonday = new Date(weekDays[0]?.date);
           const formattedMon = weekMonday.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' });
           const isoWeek = getISOWeekNumber(weekMonday);
@@ -161,105 +102,84 @@ export function PlanningView({
           return (
             <div
               key={wIdx}
-              className={`border rounded-2xl overflow-hidden transition-colors ${
-                isMorning
-                  ? 'border-amber-100 bg-white shadow-3xs'
-                  : 'border-stone-200/50 bg-stone-50/55'
-              }`}
+              className="border rounded-2xl overflow-hidden transition-colors border-amber-100 bg-white shadow-3xs"
             >
               {/* Week header banner */}
-              <div
-                className={`px-4 py-3 border-b flex justify-between items-center ${
-                  isMorning
-                    ? 'bg-amber-500/10 border-amber-100'
-                    : 'bg-stone-100/50 border-stone-150'
-                }`}
-              >
+              <div className="px-4 py-3 border-b flex justify-between items-center bg-amber-500/10 border-amber-100">
                 <div>
                   <span className="text-xs font-bold text-stone-700">Semaine {isoWeek}</span>
                   <span className="text-[11px] text-stone-500 font-mono ml-1.5">— Lun. {formattedMon}</span>
                 </div>
-
-                <span
-                  className={`text-[10px] font-bold px-2 py-1 rounded-lg flex items-center gap-1 border ${
-                    isMorning
-                      ? 'bg-amber-500/15 text-amber-900 border-amber-200'
-                      : 'bg-stone-200/50 text-stone-500 border-stone-300'
-                  }`}
-                >
-                  {isMorning ? (
-                    <>
-                      <Coffee className="w-3.5 h-3.5 text-amber-600" />
-                      <span>🌞 Matin</span>
-                    </>
-                  ) : (
-                    <>
-                      <CalendarOff className="w-3.5 h-3.5 text-stone-400" />
-                      <span>💤 Autre / Repos</span>
-                    </>
-                  )}
+                <span className="text-[10px] font-bold px-2 py-1 rounded-lg flex items-center gap-1 border bg-amber-500/15 text-amber-900 border-amber-200">
+                  <Coffee className="w-3.5 h-3.5 text-amber-600" />
+                  <span>🌞 Matin</span>
                 </span>
               </div>
 
               {/* Days inside the week */}
               <div className="divide-y divide-stone-150">
-                {!isMorning ? (
-                  <div className="p-4 text-center">
-                    <p className="text-xs text-stone-400 font-medium">
-                      Pas d'équipe du matin cette semaine-ci. Les petits déjeuners sont mis en pause.
-                    </p>
-                  </div>
-                ) : (
-                  weekDays
-                    .filter((day) => day.isWorkDay)
-                    .map((day) => {
-                      const isEditing = editingDate === day.dateString;
-                      const colors = getColors(day.colleagueColor);
+                {weekDays
+                  .filter((day) => day.isWorkDay)
+                  .map((day) => {
+                    const isEditing = editingDate === day.dateString;
+                    const colors = getColors(day.colleagueColor);
+                    const coApporteurId = coApporteurs[day.dateString];
+                    const coApporteur = coApporteurId ? colleagues.find(c => c.id === coApporteurId) : null;
+                    const coColors = coApporteur ? getColors(coApporteur.color) : null;
 
-                      return (
-                        <div key={day.dateString} className="p-3.5 flex flex-col gap-2.5">
-                          {/* Main Row */}
-                          <div className="flex items-center justify-between">
-                            <div className="flex flex-col">
-                              <span className="font-bold text-xs.5 text-stone-900">
-                                {getDayLabelFr(day.dayOfWeek)}
-                              </span>
-                              <span className="text-[10.5px] text-stone-500 font-medium select-none">
-                                {formatDateLabelFr(day.date)}
-                              </span>
-                            </div>
-
-                            {/* Assignee trigger box */}
-                            <div className="relative">
-                              {day.colleagueId ? (
-                                <button
-                                  id={`btn-edit-day-${day.dateString}`}
-                                  onClick={() => setEditingDate(isEditing ? null : day.dateString)}
-                                  className={`flex items-center gap-2 pl-2 pr-3 py-1.5 rounded-xl border transition-all ${
-                                    day.isManualOverride
-                                      ? 'border-amber-400 bg-amber-50 text-amber-950 shadow-3xs'
-                                      : `${colors.border} ${colors.background} ${colors.text} hover:opacity-90`
-                                  }`}
-                                >
-                                  <span className={`w-6 h-6 rounded-lg font-bold text-[10px] flex items-center justify-center bg-white border ${colors.border}`}>
-                                    {day.colleagueName?.slice(0, 2).toUpperCase()}
-                                  </span>
-                                  <span className="text-xs font-bold leading-none">{day.colleagueName}</span>
-                                  <ChevronDown className="w-3.5 h-3.5 opacity-60 flex-shrink-0" />
-                                </button>
-                              ) : (
-                                <button
-                                  id={`btn-edit-day-empty-${day.dateString}`}
-                                  onClick={() => setEditingDate(isEditing ? null : day.dateString)}
-                                  className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-rose-200/80 bg-rose-50/50 text-rose-800 hover:bg-rose-50 transition-colors"
-                                >
-                                  <AlertTriangle className="w-3.5 h-3.5 text-rose-600" />
-                                  <span className="text-xs font-semibold">⚠️ Aucun volontaire</span>
-                                  <ChevronDown className="w-3.5 h-3.5 opacity-60" />
-                                </button>
-                              )}
-                            </div>
+                    return (
+                      <div key={day.dateString} className="p-3.5 flex flex-col gap-2.5">
+                        {/* Main Row */}
+                        <div className="flex items-center justify-between">
+                          <div className="flex flex-col">
+                            <span className="font-bold text-xs.5 text-stone-900">
+                              {getDayLabelFr(day.dayOfWeek)}
+                            </span>
+                            <span className="text-[10.5px] text-stone-500 font-medium select-none">
+                              {formatDateLabelFr(day.date)}
+                            </span>
                           </div>
+
+                          {/* Assignee + co-apporteur */}
+                          <div className="flex flex-col items-end gap-1">
+                            {day.colleagueId ? (
+                              <button
+                                id={`btn-edit-day-${day.dateString}`}
+                                onClick={() => setEditingDate(isEditing ? null : day.dateString)}
+                                className={`flex items-center gap-2 pl-2 pr-3 py-1.5 rounded-xl border transition-all ${
+                                  day.isManualOverride
+                                    ? 'border-amber-400 bg-amber-50 text-amber-950 shadow-3xs'
+                                    : `${colors.border} ${colors.background} ${colors.text} hover:opacity-90`
+                                }`}
+                              >
+                                <span className={`w-6 h-6 rounded-lg font-bold text-[10px] flex items-center justify-center bg-white border ${colors.border}`}>
+                                  {day.colleagueName?.slice(0, 2).toUpperCase()}
+                                </span>
+                                <span className="text-xs font-bold leading-none">{day.colleagueName}</span>
+                                <ChevronDown className="w-3.5 h-3.5 opacity-60 flex-shrink-0" />
+                              </button>
+                            ) : (
+                              <button
+                                id={`btn-edit-day-empty-${day.dateString}`}
+                                onClick={() => setEditingDate(isEditing ? null : day.dateString)}
+                                className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-rose-200/80 bg-rose-50/50 text-rose-800 hover:bg-rose-50 transition-colors"
+                              >
+                                <AlertTriangle className="w-3.5 h-3.5 text-rose-600" />
+                                <span className="text-xs font-semibold">⚠️ Aucun volontaire</span>
+                                <ChevronDown className="w-3.5 h-3.5 opacity-60" />
+                              </button>
+                            )}
+                            {coApporteur && coColors && (
+                              <div className="flex items-center gap-1">
+                                <span className="text-stone-300 text-xs font-bold">+</span>
+                                <span className={`w-4 h-4 rounded text-white text-[9px] font-bold flex items-center justify-center ${coColors.background}`}>
+                                  {coApporteur.name.slice(0, 2).toUpperCase()}
+                                </span>
+                                <span className="text-[10px] text-stone-500">{coApporteur.name}</span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
 
                           {/* Override Selector Panel (displays below when clicked) */}
                           {isEditing && (
@@ -342,12 +262,37 @@ export function PlanningView({
                                     );
                                   })}
                               </div>
+
+                              {/* Co-apporteur */}
+                              <div className="pt-2 border-t border-stone-150">
+                                <p className="text-[10px] font-bold text-stone-500 uppercase mb-1.5">Co-apporteur</p>
+                                <select
+                                  value={coApporteurs[day.dateString] ?? ''}
+                                  onChange={e => {
+                                    const val = e.target.value;
+                                    setCoApporteurs(prev => {
+                                      const next = { ...prev };
+                                      if (val) next[day.dateString] = val;
+                                      else delete next[day.dateString];
+                                      return next;
+                                    });
+                                  }}
+                                  className="w-full text-xs border border-stone-200 rounded px-2 py-1.5 bg-white text-stone-700 focus:outline-none focus:ring-1 focus:ring-amber-400"
+                                >
+                                  <option value="">Aucun</option>
+                                  {colleagues
+                                    .filter(c => c.isActive && c.id !== day.colleagueId)
+                                    .map(col => (
+                                      <option key={col.id} value={col.id}>{col.name}</option>
+                                    ))
+                                  }
+                                </select>
+                              </div>
                             </div>
                           )}
                         </div>
                       );
-                    })
-                )}
+                    })}
               </div>
             </div>
           );
