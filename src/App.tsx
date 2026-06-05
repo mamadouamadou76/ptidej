@@ -104,6 +104,7 @@ function AppContent({
   const [copied, setCopied] = useState(false);
   const [copiedText, setCopiedText] = useState(false);
   const [isLoaded, setIsLoaded] = useState(false);
+  const [coApporteurs, setCoApporteurs] = useState<Record<string, string>>({});
 
   useEffect(() => {
     try {
@@ -303,7 +304,12 @@ function AppContent({
       const isoWeek = getISOWeekNumber(new Date(weekDays[0]?.date));
       const assignedDays = workDays
         .filter(d => d.colleagueId !== null)
-        .map(d => `  - ${DAY_FULL[d.dayOfWeek]} ${d.date.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' })} : ${d.colleagueName || '⚠️ Personne'}`)
+        .map(d => {
+          const coApporteurId = coApporteurs[d.dateString];
+          const coApporteur = coApporteurId ? colleagues.find(c => c.id === coApporteurId) : null;
+          const coStr = coApporteur ? ` + ${coApporteur.name}` : '';
+          return `  - ${DAY_FULL[d.dayOfWeek]} ${d.date.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' })} : ${d.colleagueName || '⚠️ Personne'}${coStr}`;
+        })
         .join('\n');
       return `📅 Semaine ${isoWeek} (${weekRange})\n${assignedDays}`;
     }).join('\n\n');
@@ -475,6 +481,8 @@ Planning généré le ${dateAujourdhui} via P'tit Déj Matinal 🥐`;
                       onClearOverride={handleClearOverride}
                       startWeekDate={settings.startWeekDate}
                       numberOfWeeks={settings.numberOfWeeks}
+                      coApporteurs={coApporteurs}
+                      setCoApporteurs={setCoApporteurs}
                     />
                   )}
                   {activeTab === 'colleagues' && (

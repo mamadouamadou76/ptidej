@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { CalendarDay, Colleague } from '../types';
 import { getColors } from '../utils/colorMapper';
 import { getISOWeekNumber } from '../utils/scheduler';
-import { Coffee, CalendarOff, RefreshCw, History, Calendar } from 'lucide-react';
+import { Coffee, CalendarOff, RefreshCw, History, Calendar, Pencil } from 'lucide-react';
 
 interface DesktopPlanningViewProps {
   schedule: CalendarDay[];
@@ -11,6 +11,8 @@ interface DesktopPlanningViewProps {
   onClearOverride: (dateString: string) => void;
   startWeekDate: string;
   numberOfWeeks: number;
+  coApporteurs: Record<string, string>;
+  setCoApporteurs: React.Dispatch<React.SetStateAction<Record<string, string>>>;
 }
 
 export function DesktopPlanningView({
@@ -20,9 +22,12 @@ export function DesktopPlanningView({
   onClearOverride,
   startWeekDate,
   numberOfWeeks,
+  coApporteurs,
+  setCoApporteurs,
 }: DesktopPlanningViewProps) {
   const [editingDate, setEditingDate] = useState<string | null>(null);
   const [showPast, setShowPast] = useState(false);
+  const [correctionMode, setCorrectionMode] = useState(false);
 
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -34,10 +39,8 @@ export function DesktopPlanningView({
     allWeeks.push(schedule.filter((day) => day.weekIndex === i));
   }
 
-  // Filtre 1 : uniquement les semaines actives (équipe du matin)
   const activeWeeks = allWeeks.filter(w => w[0]?.isMorningShift);
 
-  // Filtre 2 : sépare passé et futur/présent
   const pastWeeks = activeWeeks.filter(w => {
     const lastDay = w.filter(d => d.isWorkDay).at(-1);
     return lastDay && lastDay.dateString < todayStr;
@@ -48,7 +51,7 @@ export function DesktopPlanningView({
     return lastDay && lastDay.dateString >= todayStr;
   });
 
-  const weeksToShow = showPast
+  const weeksToShow = showPast || correctionMode
     ? [...pastWeeks, ...currentAndFutureWeeks]
     : currentAndFutureWeeks;
 
@@ -74,25 +77,39 @@ export function DesktopPlanningView({
   };
 
   return (
-      <div className="flex-1 flex flex-col overflow-auto bg-stone-50">    {/* Barre d'action historique */}
+    <div className="flex-1 flex flex-col overflow-auto bg-stone-50">
+      {/* Barre d'action */}
       <div className="flex items-center justify-between px-6 py-3 border-b border-stone-200 bg-white">
         <p className="text-xs text-stone-500">
           {currentAndFutureWeeks.length} semaine{currentAndFutureWeeks.length > 1 ? 's' : ''} à venir
           {pastWeeks.length > 0 && ` · ${pastWeeks.length} semaine${pastWeeks.length > 1 ? 's' : ''} passée${pastWeeks.length > 1 ? 's' : ''}`}
         </p>
-        {pastWeeks.length > 0 && (
+        <div className="flex items-center gap-2">
           <button
-            onClick={() => setShowPast(!showPast)}
+            onClick={() => setCorrectionMode(!correctionMode)}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold border transition-all ${
-              showPast
-                ? 'bg-stone-800 text-white border-stone-900'
+              correctionMode
+                ? 'bg-amber-600 text-white border-amber-700'
                 : 'bg-white text-stone-600 border-stone-200 hover:border-stone-400'
             }`}
           >
-            <History className="w-3.5 h-3.5" />
-            {showPast ? 'Masquer l\'historique' : 'Voir l\'historique'}
+            <Pencil className="w-3.5 h-3.5" />
+            {correctionMode ? 'Correction ON' : 'Mode correction'}
           </button>
-        )}
+          {pastWeeks.length > 0 && (
+            <button
+              onClick={() => setShowPast(!showPast)}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold border transition-all ${
+                showPast
+                  ? 'bg-stone-800 text-white border-stone-900'
+                  : 'bg-white text-stone-600 border-stone-200 hover:border-stone-400'
+              }`}
+            >
+              <History className="w-3.5 h-3.5" />
+              {showPast ? "Masquer l'historique" : "Voir l'historique"}
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="flex-1 overflow-auto p-6 scrollbar-thin scrollbar-thumb-amber-300 scrollbar-track-stone-100">
@@ -115,8 +132,8 @@ export function DesktopPlanningView({
               return (
                 <div
                   key={weekIdx}
-                  className={`bg-white border rounded-xl overflow-hidden shadow-sm transition-all ${
-                    isPast
+                  className={`bg-white border rounded-xl overflow-visible shadow-sm transition-all ${
+                    isPast && !correctionMode
                       ? 'border-stone-200 opacity-60'
                       : 'border-stone-200'
                   }`}
@@ -162,6 +179,12 @@ export function DesktopPlanningView({
                           const colors = getColors(colleague.color);
                           const isEditing = editingDate === day.dateString;
                           const isDayPast = day.dateString < todayStr;
+                          const effectivelyLocked = isDayPast && !correctionMode;
+
+                          const coApporteurId = coApporteurs[day.dateString];
+                          const coApporteur = coApporteurId
+                            ? colleagues.find(c => c.id === coApporteurId)
+                            : null;
 
                           return (
                             <tr
@@ -169,7 +192,7 @@ export function DesktopPlanningView({
                               className="border-b border-stone-100 last:border-0 hover:bg-stone-50 transition-colors"
                             >
                               <td className="px-4 py-3">
-                                <div className={`text-sm font-semibold ${isDayPast ? 'text-stone-400' : 'text-stone-800'}`}>
+                                <div className={`text-sm font-semibold ${effectivelyLocked ? 'text-stone-400' : 'text-stone-800'}`}>
                                   {DAY_LABELS[day.dayOfWeek]}
                                 </div>
                                 <div className="text-xs text-stone-400">
@@ -178,27 +201,42 @@ export function DesktopPlanningView({
                               </td>
 
                               <td className="px-4 py-3 relative">
-                                <button
-                                  onClick={() => !isDayPast && setEditingDate(isEditing ? null : day.dateString)}
-                                  disabled={isDayPast}
-                                  className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
-                                    isDayPast
-                                      ? 'opacity-50 cursor-default border-stone-200 bg-stone-50 text-stone-500'
-                                      : day.isManualOverride
-                                        ? 'border-amber-400 bg-amber-50 text-amber-900 cursor-pointer'
-                                        : `${colors.border} ${colors.background} ${colors.text} cursor-pointer`
-                                  }`}
-                                >
-                                  <div className={`w-5 h-5 rounded flex items-center justify-center text-white text-[10px] font-bold ${colors.background}`}>
-                                    {colleague.name.slice(0, 2).toUpperCase()}
-                                  </div>
-                                  {colleague.name}
-                                  {day.isManualOverride && !isDayPast && (
-                                    <span className="text-amber-500 text-[10px]">✍️</span>
-                                  )}
-                                </button>
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <button
+                                    onClick={() => !effectivelyLocked && setEditingDate(isEditing ? null : day.dateString)}
+                                    disabled={effectivelyLocked}
+                                    className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
+                                      effectivelyLocked
+                                        ? 'opacity-50 cursor-default border-stone-200 bg-stone-50 text-stone-500'
+                                        : day.isManualOverride
+                                          ? 'border-amber-400 bg-amber-50 text-amber-900 cursor-pointer'
+                                          : `${colors.border} ${colors.background} ${colors.text} cursor-pointer`
+                                    }`}
+                                  >
+                                    <div className={`w-5 h-5 rounded flex items-center justify-center text-white text-[10px] font-bold ${colors.background}`}>
+                                      {colleague.name.slice(0, 2).toUpperCase()}
+                                    </div>
+                                    {colleague.name}
+                                    {day.isManualOverride && !effectivelyLocked && (
+                                      <span className="text-amber-500 text-[10px]">✍️</span>
+                                    )}
+                                  </button>
 
-                                {isEditing && !isDayPast && (
+                                  {coApporteur && (() => {
+                                    const coColors = getColors(coApporteur.color);
+                                    return (
+                                      <div className="flex items-center gap-1">
+                                        <span className="text-stone-300 text-xs font-bold">+</span>
+                                        <div className={`w-5 h-5 rounded flex items-center justify-center text-white text-[10px] font-bold ${coColors.background}`}>
+                                          {coApporteur.name.slice(0, 2).toUpperCase()}
+                                        </div>
+                                        <span className="text-xs text-stone-500">{coApporteur.name}</span>
+                                      </div>
+                                    );
+                                  })()}
+                                </div>
+
+                                {isEditing && !effectivelyLocked && (
                                   <div className="absolute top-full mt-1 left-0 bg-white border border-stone-200 rounded-lg shadow-lg p-3 z-50 min-w-44 text-left">
                                     <div className="flex justify-between items-center mb-2 pb-2 border-b border-stone-100">
                                       <p className="text-[10px] font-bold text-stone-600 uppercase">Modifier</p>
@@ -230,6 +268,32 @@ export function DesktopPlanningView({
                                           {col.name}
                                         </button>
                                       ))}
+                                    </div>
+
+                                    {/* Co-apporteur */}
+                                    <div className="mt-3 pt-3 border-t border-stone-100">
+                                      <p className="text-[10px] font-bold text-stone-500 uppercase mb-1.5">Co-apporteur</p>
+                                      <select
+                                        value={coApporteurs[day.dateString] ?? ''}
+                                        onChange={e => {
+                                          const val = e.target.value;
+                                          setCoApporteurs(prev => {
+                                            const next = { ...prev };
+                                            if (val) next[day.dateString] = val;
+                                            else delete next[day.dateString];
+                                            return next;
+                                          });
+                                        }}
+                                        className="w-full text-xs border border-stone-200 rounded px-2 py-1.5 bg-white text-stone-700 focus:outline-none focus:ring-1 focus:ring-amber-400"
+                                      >
+                                        <option value="">Aucun</option>
+                                        {colleagues
+                                          .filter(c => c.isActive && c.id !== day.colleagueId)
+                                          .map(col => (
+                                            <option key={col.id} value={col.id}>{col.name}</option>
+                                          ))
+                                        }
+                                      </select>
                                     </div>
                                   </div>
                                 )}
