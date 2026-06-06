@@ -21,6 +21,8 @@ interface PlanningViewProps {
   onToggleAutoRecalculate: (value: boolean) => void;
   pendingRecalculate: boolean;
   onForceRecalculate: () => void;
+  currentUserRole: 'admin' | 'member' | 'viewer' | null;
+  userDisplayName: string | null;
 }
 
 export function PlanningView({
@@ -37,6 +39,8 @@ export function PlanningView({
   onToggleAutoRecalculate,
   pendingRecalculate,
   onForceRecalculate,
+  currentUserRole,
+  userDisplayName,
 }: PlanningViewProps) {
   const [editingDate, setEditingDate] = useState<string | null>(null);
   const [copiedText, setCopiedText] = useState(false);
@@ -49,6 +53,12 @@ export function PlanningView({
       else next.add(wIdx);
       return next;
     });
+  };
+
+  const canEditDay = (day: { colleagueName?: string | null }): boolean => {
+    if (!currentUserRole || currentUserRole === 'admin') return true;
+    if (currentUserRole === 'viewer') return false;
+    return day.colleagueName === userDisplayName;
   };
 
   // Group schedule by weekIndex, keep only morning-shift weeks
@@ -206,32 +216,45 @@ export function PlanningView({
 
                           {/* Assignee + co-apporteur */}
                           <div className="flex flex-col items-end gap-1">
-                            {day.colleagueId ? (
-                              <button
-                                id={`btn-edit-day-${day.dateString}`}
-                                onClick={() => setEditingDate(isEditing ? null : day.dateString)}
-                                className={`flex items-center gap-2 pl-2 pr-3 py-1.5 rounded-xl border transition-all ${
-                                  day.isManualOverride
-                                    ? 'border-amber-400 bg-amber-50 text-amber-950 shadow-3xs'
-                                    : `${colors.border} ${colors.background} ${colors.text} hover:opacity-90`
-                                }`}
-                              >
-                                <span className={`w-6 h-6 rounded-lg font-bold text-[10px] flex items-center justify-center bg-white border ${colors.border}`}>
-                                  {day.colleagueName?.slice(0, 2).toUpperCase()}
-                                </span>
-                                <span className="text-xs font-bold leading-none">{day.colleagueName}</span>
-                                <ChevronDown className="w-3.5 h-3.5 opacity-60 flex-shrink-0" />
-                              </button>
+                            {canEditDay(day) ? (
+                              day.colleagueId ? (
+                                <button
+                                  id={`btn-edit-day-${day.dateString}`}
+                                  onClick={() => setEditingDate(isEditing ? null : day.dateString)}
+                                  className={`flex items-center gap-2 pl-2 pr-3 py-1.5 rounded-xl border transition-all ${
+                                    day.isManualOverride
+                                      ? 'border-amber-400 bg-amber-50 text-amber-950 shadow-3xs'
+                                      : `${colors.border} ${colors.background} ${colors.text} hover:opacity-90`
+                                  }`}
+                                >
+                                  <span className={`w-6 h-6 rounded-lg font-bold text-[10px] flex items-center justify-center bg-white border ${colors.border}`}>
+                                    {day.colleagueName?.slice(0, 2).toUpperCase()}
+                                  </span>
+                                  <span className="text-xs font-bold leading-none">{day.colleagueName}</span>
+                                  <ChevronDown className="w-3.5 h-3.5 opacity-60 flex-shrink-0" />
+                                </button>
+                              ) : (
+                                <button
+                                  id={`btn-edit-day-empty-${day.dateString}`}
+                                  onClick={() => setEditingDate(isEditing ? null : day.dateString)}
+                                  className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-rose-200/80 bg-rose-50/50 text-rose-800 hover:bg-rose-50 transition-colors"
+                                >
+                                  <AlertTriangle className="w-3.5 h-3.5 text-rose-600" />
+                                  <span className="text-xs font-semibold">⚠️ Aucun volontaire</span>
+                                  <ChevronDown className="w-3.5 h-3.5 opacity-60" />
+                                </button>
+                              )
                             ) : (
-                              <button
-                                id={`btn-edit-day-empty-${day.dateString}`}
-                                onClick={() => setEditingDate(isEditing ? null : day.dateString)}
-                                className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-rose-200/80 bg-rose-50/50 text-rose-800 hover:bg-rose-50 transition-colors"
-                              >
-                                <AlertTriangle className="w-3.5 h-3.5 text-rose-600" />
-                                <span className="text-xs font-semibold">⚠️ Aucun volontaire</span>
-                                <ChevronDown className="w-3.5 h-3.5 opacity-60" />
-                              </button>
+                              day.colleagueId ? (
+                                <div className={`flex items-center gap-2 pl-2 pr-3 py-1.5 rounded-xl border ${colors.border} ${colors.background} ${colors.text}`}>
+                                  <span className={`w-6 h-6 rounded-lg font-bold text-[10px] flex items-center justify-center bg-white border ${colors.border}`}>
+                                    {day.colleagueName?.slice(0, 2).toUpperCase()}
+                                  </span>
+                                  <span className="text-xs font-bold leading-none">{day.colleagueName}</span>
+                                </div>
+                              ) : (
+                                <span className="text-xs text-rose-500 font-medium">⚠️ Non assigné</span>
+                              )
                             )}
                             {coApporteur && coColors && (
                               <div className="flex items-center gap-1">
@@ -246,7 +269,7 @@ export function PlanningView({
                         </div>
 
                           {/* Override Selector Panel (displays below when clicked) */}
-                          {isEditing && (
+                          {isEditing && canEditDay(day) && (
                             <div className="bg-stone-50/80 border border-stone-200 rounded-xl p-3 space-y-2 text-xs">
                               <div className="flex justify-between items-center pb-1 border-b border-stone-150">
                                 <span className="font-bold text-stone-700 text-[10px] uppercase tracking-wider">

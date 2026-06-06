@@ -28,6 +28,8 @@ interface UserProfile {
   activeTeamId?: string;
 }
 
+export type UserRole = 'admin' | 'member' | 'viewer';
+
 interface FirebaseContextType {
   user: User | null;
   profile: UserProfile | null;
@@ -36,6 +38,7 @@ interface FirebaseContextType {
   activeTeamId: string | null;
   teamName: string | null;
   isSyncing: boolean;
+  currentUserRole: UserRole | null;
   
   signInWithGoogle: () => Promise<void>;
   signInWithEmail: (email: string, password: string) => Promise<void>;
@@ -78,6 +81,7 @@ export function FirebaseProvider({
   const [loading, setLoading] = useState(true);
   const [connError, setConnError] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
+  const [currentUserRole, setCurrentUserRole] = useState<UserRole | null>(null);
 
   // 1. Mandatory Core Constraint: test the connection upon boot using doc get from server
   useEffect(() => {
@@ -142,6 +146,18 @@ export function FirebaseProvider({
       }
       
       setActiveTeamId(currentActiveTeam);
+
+      if (currentActiveTeam) {
+        try {
+          const memberSnap = await getDoc(doc(db, `teams/${currentActiveTeam}/members/${currentUser.uid}`));
+          setCurrentUserRole(memberSnap.exists() ? (memberSnap.data().role as UserRole) : null);
+        } catch {
+          setCurrentUserRole(null);
+        }
+      } else {
+        setCurrentUserRole(null);
+      }
+
       setLoading(false);
     } catch (err) {
       handleFirestoreError(err, OperationType.GET, profilePath);
@@ -199,10 +215,17 @@ export function FirebaseProvider({
       handleFirestoreError(err, OperationType.GET, absencesCollPath);
     });
 
+    const unsubMember = onSnapshot(
+      doc(db, `teams/${activeTeamId}/members/${user.uid}`),
+      (snap) => setCurrentUserRole(snap.exists() ? (snap.data().role as UserRole) : null),
+      () => setCurrentUserRole(null)
+    );
+
     return () => {
       unsubTeam();
       unsubColleagues();
       unsubAbsences();
+      unsubMember();
     };
   }, [user, activeTeamId]);
 
@@ -243,6 +266,7 @@ export function FirebaseProvider({
       setProfile(null);
       setActiveTeamId(null);
       setTeamName(null);
+      setCurrentUserRole(null);
     } catch (err) {
       console.error('Sign-Out Failed:', err);
     }
@@ -288,6 +312,16 @@ export function FirebaseProvider({
         activeTeamId: generatedTeamId
       });
 
+      // 5. Register creator as admin member
+      await setDoc(doc(db, `teams/${generatedTeamId}/members/${user.uid}`), {
+        userId: user.uid,
+        displayName: user.displayName || user.email?.split('@')[0] || 'Inconnu',
+        email: user.email || '',
+        role: 'admin' as UserRole,
+        joinedAt: new Date().toISOString()
+      });
+      setCurrentUserRole('admin');
+
       setActiveTeamId(generatedTeamId);
       return generatedTeamId;
     } catch (err) {
@@ -311,7 +345,17 @@ export function FirebaseProvider({
       await updateDoc(doc(db, profilePath), {
         activeTeamId: formattedId
       });
-      
+
+      // Register as viewer member (admin can promote later)
+      await setDoc(doc(db, `teams/${formattedId}/members/${user.uid}`), {
+        userId: user.uid,
+        displayName: user.displayName || user.email?.split('@')[0] || 'Inconnu',
+        email: user.email || '',
+        role: 'viewer' as UserRole,
+        joinedAt: new Date().toISOString()
+      });
+      setCurrentUserRole('viewer');
+
       setActiveTeamId(formattedId);
     } catch (err) {
       if (err instanceof Error && err.message.includes('Équipe inexistante')) {
@@ -330,6 +374,7 @@ export function FirebaseProvider({
       });
       setActiveTeamId(null);
       setTeamName(null);
+      setCurrentUserRole(null);
     } catch (err) {
       handleFirestoreError(err, OperationType.UPDATE, profilePath);
     }
@@ -433,6 +478,7 @@ export function FirebaseProvider({
       activeTeamId,
       teamName,
       isSyncing,
+      currentUserRole,
       signInWithGoogle,
       signInWithEmail,
       signUpWithEmail,

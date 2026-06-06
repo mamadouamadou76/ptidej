@@ -13,6 +13,8 @@ interface DesktopPlanningViewProps {
   numberOfWeeks: number;
   coApporteurs: Record<string, string>;
   setCoApporteurs: React.Dispatch<React.SetStateAction<Record<string, string>>>;
+  currentUserRole: 'admin' | 'member' | 'viewer' | null;
+  userDisplayName: string | null;
 }
 
 export function DesktopPlanningView({
@@ -24,10 +26,18 @@ export function DesktopPlanningView({
   numberOfWeeks,
   coApporteurs,
   setCoApporteurs,
+  currentUserRole,
+  userDisplayName,
 }: DesktopPlanningViewProps) {
   const [editingDate, setEditingDate] = useState<string | null>(null);
   const [showPast, setShowPast] = useState(false);
   const [correctionMode, setCorrectionMode] = useState(false);
+
+  const canEditDay = (day: { colleagueName?: string | null }): boolean => {
+    if (!currentUserRole || currentUserRole === 'admin') return true;
+    if (currentUserRole === 'viewer') return false;
+    return day.colleagueName === userDisplayName;
+  };
 
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -180,6 +190,7 @@ export function DesktopPlanningView({
                           const isEditing = editingDate === day.dateString;
                           const isDayPast = day.dateString < todayStr;
                           const effectivelyLocked = isDayPast && !correctionMode;
+                          const effectivelyEditable = !effectivelyLocked && canEditDay(day);
 
                           const coApporteurId = coApporteurs[day.dateString];
                           const coApporteur = coApporteurId
@@ -203,10 +214,10 @@ export function DesktopPlanningView({
                               <td className="px-4 py-3 relative">
                                 <div className="flex items-center gap-2 flex-wrap">
                                   <button
-                                    onClick={() => !effectivelyLocked && setEditingDate(isEditing ? null : day.dateString)}
-                                    disabled={effectivelyLocked}
+                                    onClick={() => effectivelyEditable && setEditingDate(isEditing ? null : day.dateString)}
+                                    disabled={!effectivelyEditable}
                                     className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
-                                      effectivelyLocked
+                                      !effectivelyEditable
                                         ? 'opacity-50 cursor-default border-stone-200 bg-stone-50 text-stone-500'
                                         : day.isManualOverride
                                           ? 'border-amber-400 bg-amber-50 text-amber-900 cursor-pointer'
@@ -217,7 +228,7 @@ export function DesktopPlanningView({
                                       {colleague.name.slice(0, 2).toUpperCase()}
                                     </div>
                                     {colleague.name}
-                                    {day.isManualOverride && !effectivelyLocked && (
+                                    {day.isManualOverride && effectivelyEditable && (
                                       <span className="text-amber-500 text-[10px]">✍️</span>
                                     )}
                                   </button>
@@ -236,7 +247,7 @@ export function DesktopPlanningView({
                                   })()}
                                 </div>
 
-                                {isEditing && !effectivelyLocked && (
+                                {isEditing && effectivelyEditable && (
                                   <div className="absolute top-full mt-1 left-0 bg-white border border-stone-200 rounded-lg shadow-lg p-3 z-50 min-w-44 text-left">
                                     <div className="flex justify-between items-center mb-2 pb-2 border-b border-stone-100">
                                       <p className="text-[10px] font-bold text-stone-600 uppercase">Modifier</p>

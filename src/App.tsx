@@ -13,6 +13,8 @@ import { SettingsView } from './components/SettingsView';
 import { AuthView } from './components/AuthView';
 import { TeamMgmtView } from './components/TeamMgmtView';
 import { FirebaseProvider, useAuth } from './components/FirebaseContext';
+import { AdminProvider } from './components/AdminContext';
+import { AdminDashboard } from './components/AdminDashboard';
 import { generateSchedule, computeStats, getISOWeekNumber } from './utils/scheduler';
 import { getInitialDemoData } from './utils/demoData';
 import {
@@ -21,6 +23,17 @@ import {
 } from 'lucide-react';
 
 export default function App() {
+  if (window.location.pathname === '/admin') {
+    return (
+      <AdminProvider>
+        <AdminDashboard />
+      </AdminProvider>
+    );
+  }
+  return <AppFirebase />;
+}
+
+function AppFirebase() {
   const [colleagues, setColleagues] = useState<Colleague[]>([]);
   const [absences, setAbsences] = useState<Absence[]>([]);
   const [settings, setSettings] = useState<ShiftSettings>({
@@ -104,6 +117,7 @@ function AppContent({
     loading: authLoading,
     activeTeamId,
     teamName,
+    currentUserRole,
     signOutUser,
     leaveTeam,
     updateSettingsInDB,
@@ -523,6 +537,8 @@ Planning généré le ${dateAujourdhui} via P'tit Déj Matinal 🥐`;
                       numberOfWeeks={settings.numberOfWeeks}
                       coApporteurs={coApporteurs}
                       setCoApporteurs={setCoApporteurs}
+                      currentUserRole={currentUserRole}
+                      userDisplayName={profile?.displayName || null}
                     />
                   )}
                   {activeTab === 'colleagues' && (
@@ -761,6 +777,8 @@ Planning généré le ${dateAujourdhui} via P'tit Déj Matinal 🥐`;
                 onToggleAutoRecalculate={setAutoRecalculate}
                 pendingRecalculate={pendingRecalculate}
                 onForceRecalculate={handleForceRecalculate}
+                currentUserRole={currentUserRole}
+                userDisplayName={profile?.displayName || null}
               />
             )}
             {activeTab === 'colleagues' && (
