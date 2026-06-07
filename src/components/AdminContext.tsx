@@ -21,6 +21,8 @@ export function AdminProvider({ children }: { children: ReactNode }) {
       if (user) {
         try {
           const tokenResult = await user.getIdTokenResult(true);
+          console.log('Token claims:', tokenResult.claims);
+          console.log('Admin claim:', tokenResult.claims['admin']);
           setIsAdmin(tokenResult.claims['admin'] === true);
         } catch {
           setIsAdmin(false);
