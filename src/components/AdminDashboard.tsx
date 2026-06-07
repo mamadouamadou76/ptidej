@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
-  collection, collectionGroup, getDocs, doc, getDoc,
+  collection, collectionGroup, getDocs, doc, getDoc, setDoc,
   query, orderBy, limit, onSnapshot, deleteDoc
 } from 'firebase/firestore';
 import { db } from '../utils/firebase';
@@ -9,7 +9,7 @@ import { useAdmin } from './AdminContext';
 import {
   Coffee, Users, Building2, Activity, Search, ChevronLeft, ChevronRight,
   LogOut, Shield, RefreshCw, Trash2, AlertTriangle, X,
-  TrendingUp, UserCheck, Calendar, Crown, Eye, ExternalLink
+  TrendingUp, UserCheck, Calendar, Crown, Eye, ExternalLink, FileText
 } from 'lucide-react';
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -96,6 +96,140 @@ function AccessDenied() {
   );
 }
 
+// ── Content CMS Tab ──────────────────────────────────────────────────────────
+
+type CmsFields = {
+  hero_title: string;
+  hero_subtitle: string;
+  hero_quote: string;
+  features_title: string;
+  features_subtitle: string;
+  how_title: string;
+  cta_title: string;
+};
+
+const CMS_DEFAULTS: CmsFields = {
+  hero_title: '',
+  hero_subtitle: '',
+  hero_quote: '',
+  features_title: '',
+  features_subtitle: '',
+  how_title: '',
+  cta_title: '',
+};
+
+const CMS_FIELD_CONFIG: { key: keyof CmsFields; label: string; type: 'input' | 'textarea' }[] = [
+  { key: 'hero_title',         label: 'Titre principal',                       type: 'input' },
+  { key: 'hero_subtitle',      label: 'Sous-titre',                            type: 'textarea' },
+  { key: 'hero_quote',         label: 'Citation',                              type: 'input' },
+  { key: 'features_title',     label: 'Titre section fonctionnalités',         type: 'input' },
+  { key: 'features_subtitle',  label: 'Sous-titre section fonctionnalités',    type: 'textarea' },
+  { key: 'how_title',          label: 'Titre section comment ça marche',       type: 'input' },
+  { key: 'cta_title',          label: 'Titre section CTA',                     type: 'input' },
+];
+
+function ContentTab() {
+  const [fields, setFields] = useState<CmsFields>(CMS_DEFAULTS);
+  const [cmsLoading, setCmsLoading] = useState(true);
+  const [cmsSaving, setCmsSaving] = useState(false);
+  const [cmsSaved, setCmsSaved] = useState(false);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const snap = await getDoc(doc(db, 'cms', 'landing'));
+        if (snap.exists()) {
+          setFields(prev => ({ ...prev, ...(snap.data() as Partial<CmsFields>) }));
+        }
+      } catch (err) {
+        console.error('CMS fetch error:', err);
+      } finally {
+        setCmsLoading(false);
+      }
+    })();
+  }, []);
+
+  const handleSave = async () => {
+    setCmsSaving(true);
+    setCmsSaved(false);
+    try {
+      await setDoc(doc(db, 'cms', 'landing'), fields);
+      setCmsSaved(true);
+      setTimeout(() => setCmsSaved(false), 3000);
+    } catch (err) {
+      console.error('CMS save error:', err);
+    } finally {
+      setCmsSaving(false);
+    }
+  };
+
+  return (
+    <motion.div
+      key="content"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden"
+    >
+      <div className="px-5 py-4 border-b border-zinc-800 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <FileText className="w-4 h-4 text-amber-400" />
+          <h2 className="font-bold text-sm">Contenu de la landing page</h2>
+        </div>
+        {cmsSaved && (
+          <span className="text-xs text-emerald-400 font-semibold">Contenu mis à jour ✓</span>
+        )}
+      </div>
+
+      {cmsLoading ? (
+        <div className="p-6 space-y-4">
+          {[...Array(7)].map((_, i) => (
+            <div key={i} className="space-y-1.5">
+              <div className="h-3 w-32 bg-zinc-800 rounded animate-pulse" />
+              <div className="h-10 bg-zinc-800 rounded-xl animate-pulse" />
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="p-6 space-y-5">
+          {CMS_FIELD_CONFIG.map(({ key, label, type }) => (
+            <div key={key} className="space-y-1.5">
+              <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest block">
+                {label}
+              </label>
+              {type === 'textarea' ? (
+                <textarea
+                  value={fields[key]}
+                  onChange={e => setFields(prev => ({ ...prev, [key]: e.target.value }))}
+                  rows={3}
+                  className="w-full px-3 py-2.5 bg-zinc-950 border border-zinc-700 rounded-xl text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-amber-500 transition-colors resize-none"
+                />
+              ) : (
+                <input
+                  type="text"
+                  value={fields[key]}
+                  onChange={e => setFields(prev => ({ ...prev, [key]: e.target.value }))}
+                  className="w-full px-3 py-2.5 bg-zinc-950 border border-zinc-700 rounded-xl text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-amber-500 transition-colors"
+                />
+              )}
+            </div>
+          ))}
+
+          <div className="pt-2">
+            <button
+              onClick={handleSave}
+              disabled={cmsSaving}
+              className="px-5 py-2.5 bg-amber-500 hover:bg-amber-600 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-bold rounded-xl transition-colors"
+            >
+              {cmsSaving ? 'Sauvegarde…' : 'Sauvegarder'}
+            </button>
+          </div>
+        </div>
+      )}
+    </motion.div>
+  );
+}
+
 // ── Main Component ───────────────────────────────────────────────────────────
 
 export function AdminDashboard() {
@@ -106,7 +240,7 @@ export function AdminDashboard() {
   const [activity, setActivity] = useState<ActivityItem[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const [tab, setTab] = useState<'overview' | 'users' | 'teams'>('overview');
+  const [tab, setTab] = useState<'overview' | 'users' | 'teams' | 'content'>('overview');
   const [search, setSearch] = useState('');
   const [userPage, setUserPage] = useState(0);
   const [teamPage, setTeamPage] = useState(0);
@@ -321,8 +455,8 @@ export function AdminDashboard() {
         </div>
 
         {/* ── Tabs ── */}
-        <div className="flex items-center gap-1 bg-zinc-900 border border-zinc-800 rounded-xl p-1 w-fit">
-          {(['overview', 'users', 'teams'] as const).map(t => (
+        <div className="flex items-center gap-1 bg-zinc-900 border border-zinc-800 rounded-xl p-1 w-fit flex-wrap">
+          {(['overview', 'users', 'teams', 'content'] as const).map(t => (
             <button
               key={t}
               onClick={() => setTab(t)}
@@ -332,13 +466,13 @@ export function AdminDashboard() {
                   : 'text-zinc-500 hover:text-zinc-300'
               }`}
             >
-              {t === 'overview' ? 'Vue d\'ensemble' : t === 'users' ? 'Utilisateurs' : 'Équipes'}
+              {t === 'overview' ? "Vue d'ensemble" : t === 'users' ? 'Utilisateurs' : t === 'teams' ? 'Équipes' : 'Contenu'}
             </button>
           ))}
         </div>
 
         {/* ── Search bar (shared for users/teams tabs) ── */}
-        {tab !== 'overview' && (
+        {tab !== 'overview' && tab !== 'content' && (
           <div className="relative max-w-sm">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-600" />
             <input
@@ -685,6 +819,9 @@ export function AdminDashboard() {
               )}
             </motion.div>
           )}
+
+          {/* ── CONTENT tab ── */}
+          {tab === 'content' && <ContentTab />}
 
         </AnimatePresence>
       </div>
