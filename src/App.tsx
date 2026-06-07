@@ -286,7 +286,22 @@ function AppContent({
     setTimeout(() => setCopied(false), 2000);
   };
 
-  if (!settings.startWeekDate && !authLoading) {
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-[#FDFBF7] flex items-center justify-center">
+        <div className="text-center space-y-3">
+          <Coffee className="w-12 h-12 text-amber-500 animate-bounce mx-auto" />
+          <p className="text-sm text-stone-600 font-medium">Chargement...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return <AuthView onClose={() => {}} />;
+  }
+
+  if (!settings.startWeekDate) {
     return (
       <div className="min-h-screen bg-[#FDFBF7] flex items-center justify-center">
         <div className="text-center space-y-3">
