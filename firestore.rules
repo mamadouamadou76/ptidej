@@ -104,7 +104,7 @@ service cloud.firestore {
       // Only lists teams they actually own
       allow list: if isSignedIn() && resource.data.ownerId == request.auth.uid;
       
-      allow create: if isSignedIn() && isValidId(teamId) && incoming().ownerId == request.auth.uid && isValidTeam(incoming());
+      allow create: if isSignedIn() && incoming().ownerId == request.auth.uid;
       
       // Allow general settings/members updates only for the creator
       allow update: if isSignedIn() 
@@ -132,13 +132,26 @@ service cloud.firestore {
     // 6. Subcollection: Absences
     match /teams/{teamId}/absences/{absenceId} {
       allow read, list: if isSignedIn();
-      
+
       allow create, update: if isSignedIn()
         && get(/databases/$(database)/documents/teams/{teamId}).data.ownerId == request.auth.uid
         && isValidId(absenceId)
         && isValidAbsence(incoming());
-        
+
       allow delete: if isSignedIn()
+        && get(/databases/$(database)/documents/teams/{teamId}).data.ownerId == request.auth.uid;
+    }
+
+    // 7. Subcollection: Members
+    match /teams/{teamId}/members/{memberId} {
+      allow read, list: if isSignedIn();
+
+      allow create: if isSignedIn() && (
+        request.auth.uid == memberId
+        || get(/databases/$(database)/documents/teams/{teamId}).data.ownerId == request.auth.uid
+      );
+
+      allow update, delete: if isSignedIn()
         && get(/databases/$(database)/documents/teams/{teamId}).data.ownerId == request.auth.uid;
     }
   }
