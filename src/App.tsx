@@ -116,7 +116,6 @@ function AppContent({
     user,
     profile,
     loading: authLoading,
-    isNewUser,
     activeTeamId,
     teamName,
     currentUserRole,
@@ -303,7 +302,7 @@ function AppContent({
     return <AuthView onClose={() => {}} />;
   }
 
-  if (isNewUser && !activeTeamId) {
+  if (!activeTeamId) {
     return <OnboardingModal />;
   }
 
