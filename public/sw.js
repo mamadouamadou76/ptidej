@@ -1,14 +1,12 @@
-const CACHE_NAME = 'breakfast-planner-v1';
-const ASSETS_TO_CACHE = [
-  '/',
-  '/index.html',
+const CACHE_NAME = 'breakfast-planner-v2';
+const STATIC_ASSETS = [
   '/manifest.json'
 ];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll(ASSETS_TO_CACHE);
+      return cache.addAll(STATIC_ASSETS);
     })
   );
   self.skipWaiting();
@@ -30,21 +28,21 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
-  // Simple cache-first strategy for static assets
+  // Network-first for HTML navigation: always fetch latest index.html from server
+  if (event.request.mode === 'navigate') {
+    event.respondWith(
+      fetch(event.request).catch(() => caches.match('/index.html'))
+    );
+    return;
+  }
+
+  // Cache-first for static assets (JS/CSS filenames include content hashes)
   event.respondWith(
     caches.match(event.request).then((cachedResponse) => {
       if (cachedResponse) {
         return cachedResponse;
       }
-      return fetch(event.request).then((fetchResponse) => {
-        // Return resource from network
-        return fetchResponse;
-      }).catch(() => {
-        // Return offline fallback if network fails
-        if (event.request.mode === 'navigate') {
-          return caches.match('/index.html');
-        }
-      });
+      return fetch(event.request).catch(() => null);
     })
   );
 });
