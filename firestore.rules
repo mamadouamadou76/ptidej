@@ -2,12 +2,10 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // 1. Global Default-Deny Catch-All Safety Net
     match /{document=**} {
       allow read, write: if false;
     }
 
-    // --- Global Reusable Helpers ---
     function isSignedIn() {
       return request.auth != null;
     }
@@ -16,143 +14,51 @@ service cloud.firestore {
       return isSignedIn() && request.auth.uid == userId;
     }
 
-    function isValidId(id) {
-      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
-    }
-
-    // Note: Use functions safely; request.resource is only parsed on WRITE (create/update)
-    function incoming() {
-      return request.resource.data;
-    }
-
-    function existing() {
-      return resource.data;
-    }
-
-    // --- Validation Helpers for Entities (Safety Net) ---
-    function isValidProfile(data) {
-      return data.uid == request.auth.uid
-        && data.displayName is string
-        && data.displayName.size() > 0
-        && data.displayName.size() <= 100
-        && (!data.keys().contains('activeTeamId') || (data.activeTeamId is string && data.activeTeamId.size() <= 128));
-    }
-
-    function isValidPrivateInfo(data) {
-      return data.email is string
-        && data.email.size() > 0
-        && data.email.size() <= 200;
-    }
-
-    function isValidTeam(data) {
-      return data.name is string
-        && data.name.size() > 0
-        && data.name.size() <= 100
-        && data.ownerId == request.auth.uid
-        && data.settings is map
-        && data.overrides is map;
-    }
-
-    function isValidColleague(data) {
-      return data.id is string
-        && data.id.size() > 0
-        && data.id.size() <= 100
-        && data.name is string
-        && data.name.size() > 0
-        && data.name.size() <= 100
-        && data.color is string
-        && data.color.size() <= 50
-        && data.isActive is bool
-        && data.initialCount is int
-        && data.initialCount >= 0
-        && data.initialCount <= 20;
-    }
-
-    function isValidAbsence(data) {
-      return data.id is string
-        && data.id.size() > 0
-        && data.id.size() <= 100
-        && data.colleagueId is string
-        && data.colleagueId.size() <= 100
-        && data.startDate is string
-        && data.startDate.size() == 10
-        && data.endDate is string
-        && data.endDate.size() == 10
-        && data.startDate <= data.endDate;
-    }
-
-    // --- Rules Mapping per Collection ---
-
-    // 2. User Public Profile
+    // Users
     match /users/{userId}/public/profile {
       allow read: if isSignedIn();
-      allow create, update: if isOwner(userId) && isValidProfile(incoming());
+      allow create, update: if isOwner(userId);
       allow delete: if isOwner(userId);
     }
 
-    // 3. User Private PII Isolation
     match /users/{userId}/private/info {
-      allow read: if isOwner(userId);
-      allow create, update: if isOwner(userId) && isValidPrivateInfo(incoming());
-      allow delete: if isOwner(userId);
+      allow read, create, update, delete: if isOwner(userId);
     }
 
-    // 4. Team Configurations
+    // Teams
     match /teams/{teamId} {
-      // Authenticated users can get a team if they know its ID (for joining)
       allow get: if isSignedIn();
-      // Only lists teams they actually own
       allow list: if isSignedIn() && resource.data.ownerId == request.auth.uid;
-      
-      allow create: if isSignedIn() && incoming().ownerId == request.auth.uid;
-      
-      // Allow general settings/members updates only for the creator
-      allow update: if isSignedIn() 
-        && existing().ownerId == request.auth.uid 
-        && incoming().ownerId == existing().ownerId 
-        && isValidTeam(incoming());
-        
-      allow delete: if isSignedIn() && existing().ownerId == request.auth.uid;
+      allow create: if isSignedIn() && request.resource.data.ownerId == request.auth.uid;
+      allow update: if isSignedIn() && resource.data.ownerId == request.auth.uid;
+      allow delete: if isSignedIn() && resource.data.ownerId == request.auth.uid;
     }
 
-    // 5. Subcollection: Colleagues
+    // Colleagues
     match /teams/{teamId}/colleagues/{colleagueId} {
       allow read, list: if isSignedIn();
-      
-      // Let members and team owner make adjustments
-      allow create, update: if isSignedIn() 
-        && get(/databases/$(database)/documents/teams/{teamId}).data.ownerId == request.auth.uid
-        && isValidId(colleagueId)
-        && isValidColleague(incoming());
-        
-      allow delete: if isSignedIn()
-        && get(/databases/$(database)/documents/teams/{teamId}).data.ownerId == request.auth.uid;
+      allow create, update, delete: if isSignedIn()
+        && get(/databases/$(database)/documents/teams/$(teamId)).data.ownerId == request.auth.uid;
     }
 
-    // 6. Subcollection: Absences
+    // Absences
     match /teams/{teamId}/absences/{absenceId} {
       allow read, list: if isSignedIn();
-
-      allow create, update: if isSignedIn()
-        && get(/databases/$(database)/documents/teams/{teamId}).data.ownerId == request.auth.uid
-        && isValidId(absenceId)
-        && isValidAbsence(incoming());
-
-      allow delete: if isSignedIn()
-        && get(/databases/$(database)/documents/teams/{teamId}).data.ownerId == request.auth.uid;
+      allow create, update, delete: if isSignedIn()
+        && get(/databases/$(database)/documents/teams/$(teamId)).data.ownerId == request.auth.uid;
     }
 
-    // 7. Subcollection: Members
+    // Members
     match /teams/{teamId}/members/{memberId} {
       allow read, list: if isSignedIn();
+      allow create, update, delete: if isSignedIn()
+        && get(/databases/$(database)/documents/teams/$(teamId)).data.ownerId == request.auth.uid;
+    }
 
-      allow create: if isSignedIn() && (
-        request.auth.uid == memberId
-        || get(/databases/$(database)/documents/teams/{teamId}).data.ownerId == request.auth.uid
-      );
-
-      allow update, delete: if isSignedIn()
-        && get(/databases/$(database)/documents/teams/{teamId}).data.ownerId == request.auth.uid;
+    // CMS
+    match /cms/{document} {
+      allow read: if true;
+      allow write: if isSignedIn() && request.auth.token.admin == true;
     }
   }
 }
