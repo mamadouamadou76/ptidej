@@ -60,5 +60,14 @@ service cloud.firestore {
       allow read: if true;
       allow write: if isSignedIn() && request.auth.token.admin == true;
     }
+
+    // Admin collectionGroup access
+    match /{path=**}/public/profile {
+      allow read: if request.auth != null && request.auth.token.admin == true;
+    }
+
+    match /{path=**}/private/info {
+      allow read: if request.auth != null && request.auth.token.admin == true;
+    }
   }
 }
