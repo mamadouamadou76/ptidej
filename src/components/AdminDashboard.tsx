@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
-  collection, collectionGroup, getDocs, doc, getDoc, setDoc,
+  collection, doc, getDoc, setDoc,
   query, orderBy, limit, onSnapshot, deleteDoc
 } from 'firebase/firestore';
 import { db } from '../utils/firebase';
@@ -249,87 +249,72 @@ export function AdminDashboard() {
   // ── Data fetching ──────────────────────────────────────────────────────────
 
   const fetchData = useCallback(async () => {
+    if (!adminUser) return;
     setLoading(true);
     try {
-      // Laisser le temps au token Firebase de se propager côté Firestore
       await new Promise(resolve => setTimeout(resolve, 1000));
 
-      // 1. Fetch user profiles via collectionGroup on the 'public' subcollection
-      //    Path: users/{uid}/public/profile  →  ref.parent.parent?.id = uid
-      const publicSnap = await getDocs(collectionGroup(db, 'public'));
-      const profileByUid: Record<string, UserRecord> = {};
+      const token = await adminUser.getIdToken(true);
+      const base = 'https://firestore.googleapis.com/v1/projects/openaiv1/databases/ai-studio-fce779ca-3f99-4909-b744-79951a23f490/documents';
+      const headers = { Authorization: `Bearer ${token}` };
+      const str = (fields: Record<string, any>, key: string) => fields?.[key]?.stringValue ?? '';
 
-      for (const snap of publicSnap.docs) {
-        if (snap.id !== 'profile') continue;
-        const uid = snap.ref.parent.parent?.id;
-        if (!uid) continue;
-        const d = snap.data();
-        profileByUid[uid] = {
-          uid,
-          displayName: d.displayName || 'Inconnu',
-          email: '',
-          photoURL: d.photoURL,
-          createdAt: '',
-          activeTeamId: d.activeTeamId || '',
-        };
-      }
-
-      // 2. Enrich with private info (email, createdAt)
-      const privateSnap = await getDocs(collectionGroup(db, 'private'));
-      for (const snap of privateSnap.docs) {
-        if (snap.id !== 'info') continue;
-        const uid = snap.ref.parent.parent?.id;
-        if (!uid || !profileByUid[uid]) continue;
-        const d = snap.data();
-        profileByUid[uid].email = d.email || '';
-        profileByUid[uid].createdAt = d.createdAt || '';
-      }
-
-      const userList = Object.values(profileByUid).sort((a, b) =>
-        (b.createdAt || '').localeCompare(a.createdAt || '')
-      );
-      setUsers(userList);
-
-      // 3. Fetch teams
-      const teamsSnap = await getDocs(
-        query(collection(db, 'teams'), orderBy('createdAt', 'desc'))
-      );
+      // Fetch all teams via REST
+      const teamsRes = await fetch(`${base}/teams`, { headers });
+      if (!teamsRes.ok) throw new Error(`Teams fetch failed: ${teamsRes.status}`);
+      const teamsData = await teamsRes.json();
+      const teamDocs: any[] = teamsData.documents ?? [];
 
       const teamList: TeamRecord[] = [];
-      for (const snap of teamsSnap.docs) {
-        const d = snap.data();
-        // Colleague count
+      for (const d of teamDocs) {
+        const teamId = (d.name as string).split('/').at(-1) ?? '';
+        const f = d.fields ?? {};
+
         let colleagueCount = 0;
         try {
-          const colSnap = await getDocs(collection(db, `teams/${snap.id}/colleagues`));
-          colleagueCount = colSnap.size;
+          const colRes = await fetch(`${base}/teams/${teamId}/colleagues`, { headers });
+          if (colRes.ok) {
+            const colData = await colRes.json();
+            colleagueCount = (colData.documents ?? []).length;
+          }
         } catch { /* skip */ }
 
-        // Resolve owner email from cached users
-        const ownerProfile = profileByUid[d.ownerId];
+        const ownerId = str(f, 'ownerId');
         teamList.push({
-          id: snap.id,
-          name: d.name || snap.id,
-          ownerId: d.ownerId || '',
-          ownerEmail: ownerProfile?.email || ownerProfile?.displayName || d.ownerId || '—',
-          createdAt: d.createdAt || '',
-          updatedAt: d.updatedAt,
+          id: teamId,
+          name: str(f, 'name') || teamId,
+          ownerId,
+          ownerEmail: ownerId || '—',
+          createdAt: str(f, 'createdAt'),
+          updatedAt: str(f, 'updatedAt'),
           colleagueCount,
         });
       }
+      teamList.sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
       setTeams(teamList);
+
+      // Derive unique users from team ownerIds
+      const ownerIds = [...new Set(teamList.map(t => t.ownerId).filter(Boolean))];
+      const userList: UserRecord[] = ownerIds.map(uid => ({
+        uid,
+        displayName: uid,
+        email: '',
+        createdAt: '',
+        activeTeamId: teamList.find(t => t.ownerId === uid)?.id ?? '',
+      }));
+      setUsers(userList);
 
     } catch (err) {
       console.error('Admin fetch error:', err);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [adminUser]);
 
   useEffect(() => {
-    if (!isAdmin) return;
+    if (!isAdmin || !adminUser) return;
     fetchData();
-  }, [isAdmin, fetchData]);
+  }, [isAdmin, adminUser, fetchData]);
 
   // Real-time activity: last 10 teams by updatedAt
   useEffect(() => {
