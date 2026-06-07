@@ -11,6 +11,7 @@ import { DesktopPlanningView } from './components/DesktopPlanningView';
 import { ColleaguesView } from './components/ColleaguesView';
 import { SettingsView } from './components/SettingsView';
 import { AuthView } from './components/AuthView';
+import { OnboardingModal } from './components/OnboardingModal';
 import { TeamMgmtView } from './components/TeamMgmtView';
 import { FirebaseProvider, useAuth } from './components/FirebaseContext';
 import { AdminProvider } from './components/AdminContext';
@@ -115,6 +116,7 @@ function AppContent({
     user,
     profile,
     loading: authLoading,
+    isNewUser,
     activeTeamId,
     teamName,
     currentUserRole,
@@ -299,6 +301,10 @@ function AppContent({
 
   if (!user) {
     return <AuthView onClose={() => {}} />;
+  }
+
+  if (isNewUser && !activeTeamId) {
+    return <OnboardingModal />;
   }
 
   if (!settings.startWeekDate) {

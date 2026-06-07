@@ -35,6 +35,7 @@ interface FirebaseContextType {
   profile: UserProfile | null;
   loading: boolean;
   connError: boolean;
+  isNewUser: boolean;
   activeTeamId: string | null;
   teamName: string | null;
   isSyncing: boolean;
@@ -82,6 +83,7 @@ export function FirebaseProvider({
   const [connError, setConnError] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
   const [currentUserRole, setCurrentUserRole] = useState<UserRole | null>(null);
+  const [isNewUser, setIsNewUser] = useState(false);
 
   // 1. Mandatory Core Constraint: test the connection upon boot using doc get from server
   useEffect(() => {
@@ -139,10 +141,12 @@ export function FirebaseProvider({
         });
         
         setProfile(newProfile);
+        setIsNewUser(true);
       } else {
         const data = profileDoc.data() as UserProfile;
         setProfile(data);
         currentActiveTeam = data.activeTeamId || '';
+        setIsNewUser(false);
       }
       
       setActiveTeamId(currentActiveTeam);
@@ -475,6 +479,7 @@ export function FirebaseProvider({
       profile,
       loading,
       connError,
+      isNewUser,
       activeTeamId,
       teamName,
       isSyncing,
