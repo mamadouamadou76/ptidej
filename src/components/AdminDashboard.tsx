@@ -251,6 +251,9 @@ export function AdminDashboard() {
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
+      // Laisser le temps au token Firebase de se propager côté Firestore
+      await new Promise(resolve => setTimeout(resolve, 1000));
+
       // 1. Fetch user profiles via collectionGroup on the 'public' subcollection
       //    Path: users/{uid}/public/profile  →  ref.parent.parent?.id = uid
       const publicSnap = await getDocs(collectionGroup(db, 'public'));
