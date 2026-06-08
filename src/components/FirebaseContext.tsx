@@ -342,34 +342,35 @@ export function FirebaseProvider({
     const formattedId = normalized;
     
     const teamDocPath = `teams/${formattedId}`;
-    try {
-      const docSnap = await getDoc(doc(db, teamDocPath));
-      if (!docSnap.exists()) {
-        throw new Error("Équipe inexistante pour cet identifiant.");
-      }
-      
-      const profilePath = `users/${user.uid}/public/profile`;
-      await updateDoc(doc(db, profilePath), {
-        activeTeamId: formattedId
-      });
 
-      // Register as viewer member (admin can promote later)
-      await setDoc(doc(db, `teams/${formattedId}/members/${user.uid}`), {
-        userId: user.uid,
-        displayName: user.displayName || user.email?.split('@')[0] || 'Inconnu',
-        email: user.email || '',
-        role: 'viewer' as UserRole,
-        joinedAt: new Date().toISOString()
-      });
-      setCurrentUserRole('viewer');
+    // Confirm which Firestore instance is used (debug)
+    console.log('[joinTeam] db databaseId:', (db as any)._databaseId?.database ?? '(default)');
+    console.log('[joinTeam] target doc:', teamDocPath, '| user:', user.uid);
 
-      setActiveTeamId(formattedId);
-    } catch (err) {
-      if (err instanceof Error && err.message.includes('Équipe inexistante')) {
-        throw err;
-      }
-      handleFirestoreError(err, OperationType.GET, teamDocPath);
+    // 1. Verify team exists
+    const docSnap = await getDoc(doc(db, teamDocPath))
+      .catch(err => handleFirestoreError(err, OperationType.GET, teamDocPath));
+    if (!docSnap.exists()) {
+      throw new Error("Équipe inexistante pour cet identifiant.");
     }
+
+    // 2. Link team to user profile
+    const profilePath = `users/${user.uid}/public/profile`;
+    await updateDoc(doc(db, profilePath), { activeTeamId: formattedId })
+      .catch(err => handleFirestoreError(err, OperationType.UPDATE, profilePath));
+
+    // 3. Register as viewer member
+    const memberPath = `teams/${formattedId}/members/${user.uid}`;
+    await setDoc(doc(db, memberPath), {
+      userId: user.uid,
+      displayName: user.displayName || user.email?.split('@')[0] || 'Inconnu',
+      email: user.email || '',
+      role: 'viewer' as UserRole,
+      joinedAt: new Date().toISOString()
+    }).catch(err => handleFirestoreError(err, OperationType.CREATE, memberPath));
+
+    setCurrentUserRole('viewer');
+    setActiveTeamId(formattedId);
   };
 
   const leaveTeam = async () => {

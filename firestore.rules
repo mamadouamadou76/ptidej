@@ -54,7 +54,12 @@ service cloud.firestore {
     // Members
     match /teams/{teamId}/members/{memberId} {
       allow read, list: if isSignedIn();
-      allow create, update, delete: if isSignedIn()
+      // Team owner manages all members; any signed-in user can create their own entry (self-join)
+      allow create: if isSignedIn() && (
+        get(/databases/$(database)/documents/teams/$(teamId)).data.ownerId == request.auth.uid
+        || memberId == request.auth.uid
+      );
+      allow update, delete: if isSignedIn()
         && get(/databases/$(database)/documents/teams/$(teamId)).data.ownerId == request.auth.uid;
     }
 
