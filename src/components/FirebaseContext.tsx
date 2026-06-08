@@ -335,8 +335,12 @@ export function FirebaseProvider({
 
   const joinTeam = async (teamId: string) => {
     if (!user) throw new Error("Veuillez vous authentifier d'abord.");
-    const formattedId = teamId.trim();
-    if (!formattedId) throw new Error("L'ID d'équipe est invalide.");
+    let normalized = teamId.trim().toLowerCase();
+    if (!normalized) throw new Error("L'ID d'équipe est invalide.");
+    if (!normalized.startsWith('team-')) {
+      normalized = 'team-' + normalized.replace(/^team-?/i, '');
+    }
+    const formattedId = normalized;
     
     const teamDocPath = `teams/${formattedId}`;
     try {

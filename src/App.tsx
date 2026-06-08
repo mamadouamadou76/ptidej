@@ -579,6 +579,7 @@ Planning généré le ${dateAujourdhui} via P'tit Déj Matinal 🥐`;
                       onUpdateSettings={handleUpdateSettings}
                       onResetDemoData={handleResetDemoData}
                       onClearAll={handleClearAll}
+                      teamCode={activeTeamId}
                     />
                   )}
                 </>
@@ -819,6 +820,7 @@ Planning généré le ${dateAujourdhui} via P'tit Déj Matinal 🥐`;
                 onUpdateSettings={handleUpdateSettings}
                 onResetDemoData={handleResetDemoData}
                 onClearAll={handleClearAll}
+                teamCode={activeTeamId}
               />
             )}
           </>

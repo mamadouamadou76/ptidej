@@ -242,7 +242,7 @@ export function OnboardingModal() {
                 <input
                   type="text"
                   autoFocus
-                  placeholder="Code équipe (ex : TEAM-XXXXXX)"
+                  placeholder="Code équipe (ex : team-XXXXXX)"
                   value={teamCode}
                   onChange={e => setTeamCode(e.target.value)}
                   onKeyDown={e => e.key === 'Enter' && teamCode.trim() && handleJoin()}

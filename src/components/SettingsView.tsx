@@ -1,8 +1,8 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { ShiftSettings } from '../types';
-import { 
-  Calendar, RotateCcw, Check, RefreshCw, AlertTriangle, 
-  HelpCircle, Sparkles, Clock, Hammer
+import {
+  Calendar, RotateCcw, Check, RefreshCw, AlertTriangle,
+  HelpCircle, Sparkles, Clock, Hammer, Clipboard
 } from 'lucide-react';
 import { getMonday, formatLocalDate, getISOWeekNumber } from '../utils/scheduler';
 
@@ -11,6 +11,7 @@ interface SettingsViewProps {
   onUpdateSettings: (settings: ShiftSettings) => void;
   onResetDemoData: () => void;
   onClearAll: () => void;
+  teamCode?: string | null;
 }
 
 export function SettingsView({
@@ -18,7 +19,16 @@ export function SettingsView({
   onUpdateSettings,
   onResetDemoData,
   onClearAll,
+  teamCode,
 }: SettingsViewProps) {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopyCode = () => {
+    if (!teamCode) return;
+    navigator.clipboard.writeText(teamCode);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
   
   // Compute the Monday date and ISO week number for each week in the cycle
   const weekMetas = Array.from({ length: settings.numberOfWeeks }, (_, i) => {
@@ -119,6 +129,27 @@ export function SettingsView({
 
   return (
     <div className="flex-1 overflow-y-auto p-4 space-y-5">
+
+      {/* Code équipe — partage avec les collègues */}
+      {teamCode && (
+        <div className="bg-emerald-500/5 border border-emerald-500/20 p-4 rounded-2xl space-y-2">
+          <p className="text-xs font-bold text-emerald-800 uppercase tracking-wide">Code de votre équipe</p>
+          <p className="text-[11px] text-stone-500">Partagez ce code avec vos collègues pour qu'ils rejoignent votre équipe.</p>
+          <div className="flex items-center gap-2">
+            <code className="flex-1 bg-white border border-emerald-200 px-3 py-2 rounded-xl text-sm font-mono font-bold text-emerald-700 text-center tracking-wide select-all">
+              {teamCode}
+            </code>
+            <button
+              onClick={handleCopyCode}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-emerald-300 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-xs font-bold transition-all flex-shrink-0"
+            >
+              {copied ? <Check className="w-3.5 h-3.5" /> : <Clipboard className="w-3.5 h-3.5" />}
+              {copied ? 'Copié !' : 'Copier'}
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Nombre de semaines à programmer */}
       <div className="bg-white border border-stone-200/80 p-4 rounded-2xl shadow-xs space-y-3">
         <h3 className="font-bold text-stone-900 text-sm flex items-center gap-2">
