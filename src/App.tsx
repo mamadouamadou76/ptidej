@@ -245,8 +245,8 @@ function AppContent({
   };
 
   const handleUpdateSettings = (newSettings: ShiftSettings) => {
+    setSettings(newSettings);
     if (activeTeamId) updateSettingsInDB(newSettings);
-    else setSettings(newSettings);
   };
 
   const handleResetDemoData = () => {
