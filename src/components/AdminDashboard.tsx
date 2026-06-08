@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   collection, doc, getDoc, getDocs, setDoc, updateDoc,
-  query, orderBy, limit, onSnapshot, deleteDoc
+  query, where, orderBy, limit, onSnapshot, deleteDoc
 } from 'firebase/firestore';
 import { db } from '../utils/firebase';
 import { useAdmin } from './AdminContext';
@@ -378,17 +378,34 @@ export function AdminDashboard() {
   const handleDeleteUser = async (uid: string) => {
     try {
       await deleteDoc(doc(db, 'users', uid, 'public', 'profile'));
-      await deleteDoc(doc(db, 'users', uid, 'private', 'info'));
-      const userTeams = teams.filter(t => t.ownerId === uid);
-      for (const t of userTeams) {
-        await deleteDoc(doc(db, 'teams', t.id));
-      }
-      setUsers(prev => prev.filter(u => u.uid !== uid));
-      setTeams(prev => prev.filter(t => t.ownerId !== uid));
-      setConfirmDeleteUser(null);
     } catch (err) {
-      console.error('Delete user error:', err);
+      console.error(`Delete /users/${uid}/public/profile failed:`, err);
     }
+
+    try {
+      await deleteDoc(doc(db, 'users', uid, 'private', 'info'));
+    } catch (err) {
+      console.error(`Delete /users/${uid}/private/info failed:`, err);
+    }
+
+    try {
+      const teamsSnap = await getDocs(
+        query(collection(db, 'teams'), where('ownerId', '==', uid))
+      );
+      for (const snap of teamsSnap.docs) {
+        try {
+          await deleteDoc(doc(db, 'teams', snap.id));
+        } catch (err) {
+          console.error(`Delete /teams/${snap.id} failed:`, err);
+        }
+      }
+    } catch (err) {
+      console.error(`Fetch teams for ${uid} failed:`, err);
+    }
+
+    setUsers(prev => prev.filter(u => u.uid !== uid));
+    setTeams(prev => prev.filter(t => t.ownerId !== uid));
+    setConfirmDeleteUser(null);
   };
 
   // ── Format helpers ─────────────────────────────────────────────────────────
