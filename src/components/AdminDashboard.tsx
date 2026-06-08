@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
-  collection, doc, getDoc, setDoc,
+  collection, doc, getDoc, getDocs, setDoc,
   query, orderBy, limit, onSnapshot, deleteDoc
 } from 'firebase/firestore';
 import { db } from '../utils/firebase';
@@ -249,108 +249,66 @@ export function AdminDashboard() {
   // ── Data fetching ──────────────────────────────────────────────────────────
 
   const fetchData = useCallback(async () => {
-    if (!adminUser) return;
     setLoading(true);
     try {
-      await new Promise(resolve => setTimeout(resolve, 1000));
-
-      console.log('🔑 Tentative: getIdToken admin');
-      const token = await adminUser.getIdToken(true);
-      console.log('✅ Token obtenu:', token.slice(0, 20) + '…');
-
-      const base = 'https://firestore.googleapis.com/v1/projects/openaiv1/databases/ai-studio-fce779ca-3f99-4909-b744-79951a23f490/documents';
-      const headers = { Authorization: `Bearer ${token}` };
-      const str = (fields: Record<string, any>, key: string) => fields?.[key]?.stringValue ?? '';
-
-      console.log('🔍 Tentative: REST GET /teams');
-      const teamsRes = await fetch(`${base}/teams`, { headers });
-      console.log('📡 /teams status:', teamsRes.status, teamsRes.statusText);
-      if (!teamsRes.ok) {
-        const body = await teamsRes.text();
-        console.error('❌ /teams error body:', body);
-        throw new Error(`Teams fetch failed: ${teamsRes.status}`);
-      }
-      const teamsData = await teamsRes.json();
-      const teamDocs: any[] = teamsData.documents ?? [];
-      console.log('✅ Réussi: /teams — documents reçus:', teamDocs.length);
+      // Teams
+      const teamsSnap = await getDocs(query(collection(db, 'teams'), orderBy('createdAt', 'desc')));
 
       const teamList: TeamRecord[] = [];
-      for (const d of teamDocs) {
-        const teamId = (d.name as string).split('/').at(-1) ?? '';
-        const f = d.fields ?? {};
-
+      for (const snap of teamsSnap.docs) {
+        const d = snap.data();
         let colleagueCount = 0;
         try {
-          console.log(`🔍 Tentative: REST GET /teams/${teamId}/colleagues`);
-          const colRes = await fetch(`${base}/teams/${teamId}/colleagues`, { headers });
-          console.log(`📡 /teams/${teamId}/colleagues status:`, colRes.status);
-          if (colRes.ok) {
-            const colData = await colRes.json();
-            colleagueCount = (colData.documents ?? []).length;
-            console.log(`✅ Réussi: /teams/${teamId}/colleagues — count:`, colleagueCount);
-          } else {
-            console.warn(`⚠️ /teams/${teamId}/colleagues non OK:`, colRes.status);
-          }
-        } catch (colErr) {
-          console.warn(`⚠️ /teams/${teamId}/colleagues exception:`, colErr);
-        }
-
-        const ownerId = str(f, 'ownerId');
+          const colSnap = await getDocs(collection(db, 'teams', snap.id, 'colleagues'));
+          colleagueCount = colSnap.size;
+        } catch { /* skip */ }
         teamList.push({
-          id: teamId,
-          name: str(f, 'name') || teamId,
-          ownerId,
-          ownerEmail: ownerId || '—',
-          createdAt: str(f, 'createdAt'),
-          updatedAt: str(f, 'updatedAt'),
+          id: snap.id,
+          name: d.name || snap.id,
+          ownerId: d.ownerId || '',
+          ownerEmail: d.ownerId || '—',
+          createdAt: d.createdAt || '',
+          updatedAt: d.updatedAt || '',
           colleagueCount,
         });
       }
-      teamList.sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
       setTeams(teamList);
-      console.log('✅ Teams state mis à jour:', teamList.length, 'équipes');
 
-      // Derive unique users from team ownerIds
+      // Users: public profile for each unique ownerId
       const ownerIds = [...new Set(teamList.map(t => t.ownerId).filter(Boolean))];
-      const userList: UserRecord[] = ownerIds.map(uid => ({
-        uid,
-        displayName: uid,
-        email: '',
-        createdAt: '',
-        activeTeamId: teamList.find(t => t.ownerId === uid)?.id ?? '',
-      }));
+      const userList: UserRecord[] = [];
+      for (const uid of ownerIds) {
+        const profileDoc = await getDoc(doc(db, 'users', uid, 'public', 'profile'));
+        const p = profileDoc.exists() ? profileDoc.data() : {};
+        userList.push({
+          uid,
+          displayName: p.displayName || uid,
+          email: p.email || '',
+          photoURL: p.photoURL,
+          createdAt: p.createdAt || '',
+          activeTeamId: teamList.find(t => t.ownerId === uid)?.id ?? '',
+        });
+      }
       setUsers(userList);
-      console.log('✅ Users state mis à jour:', userList.length, 'ownerIds uniques');
 
     } catch (err) {
-      console.error('❌ Admin fetch error:', err);
+      console.error('Admin fetch error:', err);
     } finally {
       setLoading(false);
     }
-  }, [adminUser]);
+  }, []);
 
   useEffect(() => {
-    if (!isAdmin || !adminUser) return;
+    if (!isAdmin) return;
     fetchData();
-  }, [isAdmin, adminUser, fetchData]);
+  }, [isAdmin, fetchData]);
 
-  // Real-time activity: last 10 teams by updatedAt
-  // NOTE: uses SDK token — first emission may come from local IndexedDB cache
-  //       (fromCache: true) rather than the server. Server read requires admin
-  //       token to have propagated; check logs to distinguish cache vs server.
+  // Real-time activity feed: last 10 teams by updatedAt
   useEffect(() => {
-    if (!isAdmin || !adminUser) return;
-    console.log('🔍 Tentative: onSnapshot collection(teams) orderBy updatedAt limit 10');
+    if (!isAdmin) return;
     const q = query(collection(db, 'teams'), orderBy('updatedAt', 'desc'), limit(10));
     const unsub = onSnapshot(q, { includeMetadataChanges: true }, (snap) => {
-      const fromCache = snap.metadata.fromCache;
-      const hasPending = snap.metadata.hasPendingWrites;
-      console.log(
-        fromCache ? '📦 onSnapshot teams — depuis le CACHE local' : '🌐 onSnapshot teams — depuis le SERVEUR',
-        snap.docs.length, 'docs', { fromCache, hasPendingWrites: hasPending }
-      );
-      // Ignore stale cache emissions — only update state with server data
-      if (fromCache) return;
+      if (snap.metadata.fromCache) return;
       const items: ActivityItem[] = snap.docs.map(d => ({
         id: d.id,
         teamName: d.data().name || d.id,
@@ -358,9 +316,9 @@ export function AdminDashboard() {
         at: d.data().updatedAt || d.data().createdAt || '',
       }));
       setActivity(items);
-    }, (err) => { console.error('❌ onSnapshot teams error (server):', err); });
+    }, () => { /* silent fail */ });
     return unsub;
-  }, [isAdmin, adminUser]);
+  }, [isAdmin]);
 
   // ── Derived stats ──────────────────────────────────────────────────────────
 
