@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useAuth } from './FirebaseContext';
-import { Coffee, Plus, X, ChevronRight, RefreshCw } from 'lucide-react';
+import { Coffee, Plus, X, ChevronRight, RefreshCw, Users, Link } from 'lucide-react';
 import { Colleague, ShiftSettings } from '../types';
 
 const COLORS = ['amber', 'emerald', 'blue', 'rose', 'violet', 'pink', 'orange', 'teal'];
@@ -18,6 +18,7 @@ const COLOR_BG: Record<string, string> = {
 };
 
 type Frequency = 'weekly' | 'biweekly' | 'monthly';
+type View = 'choice' | 'join' | 'create';
 
 function getStartMonday(): string {
   const d = new Date();
@@ -48,20 +49,47 @@ const variants = {
 const STEPS = 4;
 
 export function OnboardingModal() {
-  const { createTeam } = useAuth();
+  const { createTeam, joinTeam } = useAuth();
 
+  const [view, setView] = useState<View>('choice');
   const [step, setStep] = useState(1);
   const [direction, setDirection] = useState(1);
+
+  // Create team state
   const [teamName, setTeamName] = useState('');
   const [colleagueName, setColleagueName] = useState('');
   const [colleagues, setColleagues] = useState<Colleague[]>([]);
   const [frequency, setFrequency] = useState<Frequency>('weekly');
+
+  // Join team state
+  const [teamCode, setTeamCode] = useState('');
+
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const goTo = (next: number) => {
     setDirection(next > step ? 1 : -1);
     setStep(next);
+  };
+
+  const startCreate = () => {
+    setError(null);
+    setDirection(1);
+    setStep(1);
+    setView('create');
+  };
+
+  const startJoin = () => {
+    setError(null);
+    setTeamCode('');
+    setDirection(1);
+    setView('join');
+  };
+
+  const backToChoice = () => {
+    setError(null);
+    setDirection(-1);
+    setView('choice');
   };
 
   const addColleague = () => {
@@ -93,37 +121,154 @@ export function OnboardingModal() {
     }
   };
 
+  const handleJoin = async () => {
+    if (!teamCode.trim()) return;
+    setLoading(true);
+    setError(null);
+    try {
+      await joinTeam(teamCode.trim());
+      // FirebaseContext updates activeTeamId → App.tsx closes modal automatically
+    } catch (err: any) {
+      setError(err.message || "Code d'équipe invalide.");
+      setLoading(false);
+    }
+  };
+
+  const showBack =
+    !loading && (
+      view === 'join' ||
+      (view === 'create' && step >= 1)
+    );
+
   return (
     <div className="fixed inset-0 bg-stone-900/60 backdrop-blur-sm z-50 flex items-center justify-center px-4">
       <div className="w-full max-w-md bg-white rounded-3xl shadow-2xl overflow-hidden">
 
-        {/* Progress bar */}
+        {/* Progress bar — only visible during create flow */}
         <div className="h-1.5 bg-stone-100">
           <div
             className="h-full bg-amber-500 transition-all duration-500 ease-out"
-            style={{ width: `${(step / STEPS) * 100}%` }}
+            style={{ width: view === 'create' ? `${(step / STEPS) * 100}%` : '0%' }}
           />
         </div>
 
-        {/* Step dots */}
-        <div className="flex items-center justify-center gap-2 pt-4 select-none">
-          {Array.from({ length: STEPS }, (_, i) => i + 1).map(n => (
-            <div
-              key={n}
-              className={`w-2 h-2 rounded-full transition-all duration-300 ${
-                n < step ? 'bg-amber-500' :
-                n === step ? 'bg-amber-500 scale-125' :
-                'bg-stone-200'
-              }`}
-            />
-          ))}
-        </div>
+        {/* Step dots — only visible during create flow */}
+        {view === 'create' && (
+          <div className="flex items-center justify-center gap-2 pt-4 select-none">
+            {Array.from({ length: STEPS }, (_, i) => i + 1).map(n => (
+              <div
+                key={n}
+                className={`w-2 h-2 rounded-full transition-all duration-300 ${
+                  n < step ? 'bg-amber-500' :
+                  n === step ? 'bg-amber-500 scale-125' :
+                  'bg-stone-200'
+                }`}
+              />
+            ))}
+          </div>
+        )}
 
         {/* Step content */}
         <div className="px-6 py-5 min-h-[300px] overflow-hidden relative">
           <AnimatePresence mode="wait" custom={direction}>
 
-            {step === 1 && (
+            {/* ── CHOICE screen ── */}
+            {view === 'choice' && (
+              <motion.div
+                key="choice"
+                custom={direction}
+                variants={variants}
+                initial="enter"
+                animate="center"
+                exit="exit"
+                transition={{ duration: 0.22, ease: 'easeInOut' }}
+                className="space-y-6 text-center"
+              >
+                <div className="pt-3 space-y-2">
+                  <div className="inline-flex bg-amber-500 text-white p-4 rounded-2xl shadow-md">
+                    <Coffee className="w-8 h-8 fill-white" />
+                  </div>
+                  <h2 className="text-xl font-extrabold text-stone-900">Bienvenue sur P'tit Déj ! 🥐</h2>
+                  <p className="text-sm text-stone-500">Comment souhaitez-vous commencer ?</p>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3 text-left">
+                  <button
+                    onClick={startCreate}
+                    className="flex flex-col items-center gap-3 p-4 rounded-2xl border-2 border-stone-200 hover:border-amber-400 hover:bg-amber-50 transition-all group"
+                  >
+                    <div className="p-3 bg-amber-100 rounded-xl group-hover:bg-amber-200 transition-colors">
+                      <Users className="w-6 h-6 text-amber-600" />
+                    </div>
+                    <div className="text-center">
+                      <p className="text-sm font-bold text-stone-900">Créer mon équipe</p>
+                      <p className="text-xs text-stone-500 mt-0.5 leading-relaxed">Configurez votre équipe et invitez vos collègues</p>
+                    </div>
+                  </button>
+
+                  <button
+                    onClick={startJoin}
+                    className="flex flex-col items-center gap-3 p-4 rounded-2xl border-2 border-stone-200 hover:border-blue-400 hover:bg-blue-50 transition-all group"
+                  >
+                    <div className="p-3 bg-blue-100 rounded-xl group-hover:bg-blue-200 transition-colors">
+                      <Link className="w-6 h-6 text-blue-600" />
+                    </div>
+                    <div className="text-center">
+                      <p className="text-sm font-bold text-stone-900">Rejoindre une équipe</p>
+                      <p className="text-xs text-stone-500 mt-0.5 leading-relaxed">Entrez le code partagé par votre responsable</p>
+                    </div>
+                  </button>
+                </div>
+              </motion.div>
+            )}
+
+            {/* ── JOIN screen ── */}
+            {view === 'join' && (
+              <motion.div
+                key="join"
+                custom={direction}
+                variants={variants}
+                initial="enter"
+                animate="center"
+                exit="exit"
+                transition={{ duration: 0.22, ease: 'easeInOut' }}
+                className="space-y-5 pt-3"
+              >
+                <div className="space-y-1">
+                  <h2 className="text-lg font-extrabold text-stone-900">Rejoindre une équipe</h2>
+                  <p className="text-xs text-stone-500">Entrez le code partagé par votre responsable.</p>
+                </div>
+
+                <input
+                  type="text"
+                  autoFocus
+                  placeholder="Code équipe (ex : TEAM-XXXXXX)"
+                  value={teamCode}
+                  onChange={e => setTeamCode(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && teamCode.trim() && handleJoin()}
+                  className="w-full px-4 py-3 bg-stone-50 border border-stone-200 rounded-xl text-sm text-stone-900 placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all font-mono tracking-wide"
+                />
+
+                {error && (
+                  <p className="text-xs text-rose-700 bg-rose-50 border border-rose-200 rounded-lg px-3 py-2 font-medium">{error}</p>
+                )}
+
+                <button
+                  onClick={handleJoin}
+                  disabled={!teamCode.trim() || loading}
+                  className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-xl text-sm transition-all active:scale-98 flex items-center justify-center gap-2 shadow-sm disabled:opacity-40"
+                >
+                  {loading ? (
+                    <><RefreshCw className="w-4 h-4 animate-spin" /> Vérification…</>
+                  ) : (
+                    <>Rejoindre <Link className="w-4 h-4" /></>
+                  )}
+                </button>
+              </motion.div>
+            )}
+
+            {/* ── CREATE step 1 — Welcome ── */}
+            {view === 'create' && step === 1 && (
               <motion.div
                 key="step1"
                 custom={direction}
@@ -138,7 +283,7 @@ export function OnboardingModal() {
                   <div className="inline-flex bg-amber-500 text-white p-4 rounded-2xl shadow-md">
                     <Coffee className="w-8 h-8 fill-white" />
                   </div>
-                  <h2 className="text-xl font-extrabold text-stone-900">Bienvenue sur P'tit Déj ! 🥐</h2>
+                  <h2 className="text-xl font-extrabold text-stone-900">Créer mon équipe</h2>
                   <p className="text-sm text-stone-500 leading-relaxed max-w-xs mx-auto">
                     Organisez les petits-déjeuners de votre équipe en 2 minutes.
                   </p>
@@ -152,7 +297,8 @@ export function OnboardingModal() {
               </motion.div>
             )}
 
-            {step === 2 && (
+            {/* ── CREATE step 2 — Team name ── */}
+            {view === 'create' && step === 2 && (
               <motion.div
                 key="step2"
                 custom={direction}
@@ -186,7 +332,8 @@ export function OnboardingModal() {
               </motion.div>
             )}
 
-            {step === 3 && (
+            {/* ── CREATE step 3 — Colleagues ── */}
+            {view === 'create' && step === 3 && (
               <motion.div
                 key="step3"
                 custom={direction}
@@ -255,7 +402,8 @@ export function OnboardingModal() {
               </motion.div>
             )}
 
-            {step === 4 && (
+            {/* ── CREATE step 4 — Frequency ── */}
+            {view === 'create' && step === 4 && (
               <motion.div
                 key="step4"
                 custom={direction}
@@ -301,7 +449,7 @@ export function OnboardingModal() {
                   className="w-full bg-amber-500 hover:bg-amber-600 text-white font-bold py-3 rounded-xl text-sm transition-all active:scale-98 flex items-center justify-center gap-2 shadow-sm disabled:opacity-70"
                 >
                   {loading ? (
-                    <><RefreshCw className="w-4 h-4 animate-spin" /> Création en cours...</>
+                    <><RefreshCw className="w-4 h-4 animate-spin" /> Création en cours…</>
                   ) : (
                     <>Créer mon équipe <Coffee className="w-4 h-4" /></>
                   )}
@@ -313,10 +461,14 @@ export function OnboardingModal() {
         </div>
 
         {/* Back navigation */}
-        {step > 1 && !loading && (
+        {showBack && (
           <div className="px-6 pb-5 -mt-1">
             <button
-              onClick={() => goTo(step - 1)}
+              onClick={() => {
+                if (view === 'join') { backToChoice(); return; }
+                if (view === 'create' && step === 1) { backToChoice(); return; }
+                goTo(step - 1);
+              }}
               className="text-xs text-stone-400 hover:text-stone-700 font-mono font-bold transition-colors"
             >
               ← Retour
