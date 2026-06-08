@@ -159,16 +159,28 @@ export function SettingsView({
         <p className="text-xs text-stone-500">
           Définissez le nombre de semaines pour lesquelles le planning doit être généré (entre 1 et 12).
         </p>
-        <div className="relative">
-          <input
-            type="number"
-            id="number-of-weeks-input"
-            value={settings.numberOfWeeks}
-            onChange={(e) => handleNumberOfWeeksChange(parseInt(e.target.value))}
-            className="w-full px-3.5 py-2 rounded-xl text-sm border border-stone-200 outline-none focus:border-amber-500 bg-stone-50/50 font-mono"
-            min="1"
-            max="12"
-          />
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={() => handleNumberOfWeeksChange(settings.numberOfWeeks - 1)}
+            disabled={settings.numberOfWeeks <= 1}
+            className="w-10 h-10 flex items-center justify-center rounded-xl border border-stone-200 bg-stone-50 text-stone-700 text-lg font-bold hover:bg-stone-100 active:bg-stone-200 disabled:opacity-30 disabled:cursor-not-allowed transition-colors select-none"
+            aria-label="Diminuer le nombre de semaines"
+          >
+            −
+          </button>
+          <span className="flex-1 text-center text-2xl font-bold font-mono text-stone-800 tabular-nums">
+            {settings.numberOfWeeks}
+          </span>
+          <button
+            type="button"
+            onClick={() => handleNumberOfWeeksChange(settings.numberOfWeeks + 1)}
+            disabled={settings.numberOfWeeks >= 12}
+            className="w-10 h-10 flex items-center justify-center rounded-xl border border-stone-200 bg-stone-50 text-stone-700 text-lg font-bold hover:bg-stone-100 active:bg-stone-200 disabled:opacity-30 disabled:cursor-not-allowed transition-colors select-none"
+            aria-label="Augmenter le nombre de semaines"
+          >
+            +
+          </button>
         </div>
       </div>
 
