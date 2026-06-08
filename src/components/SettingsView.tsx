@@ -12,6 +12,7 @@ interface SettingsViewProps {
   onResetDemoData: () => void;
   onClearAll: () => void;
   teamCode?: string | null;
+  readOnly?: boolean;
 }
 
 export function SettingsView({
@@ -20,6 +21,7 @@ export function SettingsView({
   onResetDemoData,
   onClearAll,
   teamCode,
+  readOnly = false,
 }: SettingsViewProps) {
   const [copied, setCopied] = useState(false);
 
@@ -150,6 +152,14 @@ export function SettingsView({
         </div>
       )}
 
+      {/* Read-only notice for viewers */}
+      {readOnly && (
+        <div className="bg-amber-50 border border-amber-200 px-4 py-3 rounded-2xl text-xs text-amber-800 flex items-center gap-2">
+          <span className="text-base">🔒</span>
+          <span>En tant que membre, vous pouvez consulter les paramètres mais seul l'administrateur peut les modifier.</span>
+        </div>
+      )}
+
       {/* Nombre de semaines à programmer */}
       <div className="bg-white border border-stone-200/80 p-4 rounded-2xl shadow-xs space-y-3">
         <h3 className="font-bold text-stone-900 text-sm flex items-center gap-2">
@@ -163,7 +173,7 @@ export function SettingsView({
           <button
             type="button"
             onClick={() => handleNumberOfWeeksChange(settings.numberOfWeeks - 1)}
-            disabled={settings.numberOfWeeks <= 1}
+            disabled={readOnly || settings.numberOfWeeks <= 1}
             className="w-10 h-10 flex items-center justify-center rounded-xl border border-stone-200 bg-stone-50 text-stone-700 text-lg font-bold hover:bg-stone-100 active:bg-stone-200 disabled:opacity-30 disabled:cursor-not-allowed transition-colors select-none"
             aria-label="Diminuer le nombre de semaines"
           >
@@ -175,7 +185,7 @@ export function SettingsView({
           <button
             type="button"
             onClick={() => handleNumberOfWeeksChange(settings.numberOfWeeks + 1)}
-            disabled={settings.numberOfWeeks >= 12}
+            disabled={readOnly || settings.numberOfWeeks >= 12}
             className="w-10 h-10 flex items-center justify-center rounded-xl border border-stone-200 bg-stone-50 text-stone-700 text-lg font-bold hover:bg-stone-100 active:bg-stone-200 disabled:opacity-30 disabled:cursor-not-allowed transition-colors select-none"
             aria-label="Augmenter le nombre de semaines"
           >

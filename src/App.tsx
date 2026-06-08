@@ -245,6 +245,7 @@ function AppContent({
   };
 
   const handleUpdateSettings = (newSettings: ShiftSettings) => {
+    if (activeTeamId && currentUserRole === 'viewer') return;
     setSettings(newSettings);
     if (activeTeamId) updateSettingsInDB(newSettings);
   };
@@ -580,6 +581,7 @@ Planning généré le ${dateAujourdhui} via P'tit Déj Matinal 🥐`;
                       onResetDemoData={handleResetDemoData}
                       onClearAll={handleClearAll}
                       teamCode={activeTeamId}
+                      readOnly={!!activeTeamId && currentUserRole === 'viewer'}
                     />
                   )}
                 </>
@@ -821,6 +823,7 @@ Planning généré le ${dateAujourdhui} via P'tit Déj Matinal 🥐`;
                 onResetDemoData={handleResetDemoData}
                 onClearAll={handleClearAll}
                 teamCode={activeTeamId}
+                readOnly={!!activeTeamId && currentUserRole === 'viewer'}
               />
             )}
           </>
