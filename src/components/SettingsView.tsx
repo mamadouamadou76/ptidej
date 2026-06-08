@@ -41,7 +41,7 @@ export function SettingsView({
 
   // Handle number of weeks modification
   const handleNumberOfWeeksChange = (num: number) => {
-    if (num < 1 || num > 12) return; // Limit between 1 and 12 weeks for now
+    if (num < 1 || num > 52) return;
     onUpdateSettings({
       ...settings,
       numberOfWeeks: num,
@@ -167,7 +167,7 @@ export function SettingsView({
           <span>Nombre de semaines à programmer</span>
         </h3>
         <p className="text-xs text-stone-500">
-          Définissez le nombre de semaines pour lesquelles le planning doit être généré (entre 1 et 12).
+          Définissez le nombre de semaines pour lesquelles le planning doit être généré (entre 1 et 52).
         </p>
         <div className="flex items-center gap-3">
           <button
@@ -185,7 +185,7 @@ export function SettingsView({
           <button
             type="button"
             onClick={() => handleNumberOfWeeksChange(settings.numberOfWeeks + 1)}
-            disabled={readOnly || settings.numberOfWeeks >= 12}
+            disabled={readOnly || settings.numberOfWeeks >= 52}
             className="w-10 h-10 flex items-center justify-center rounded-xl border border-stone-200 bg-stone-50 text-stone-700 text-lg font-bold hover:bg-stone-100 active:bg-stone-200 disabled:opacity-30 disabled:cursor-not-allowed transition-colors select-none"
             aria-label="Augmenter le nombre de semaines"
           >
