@@ -335,12 +335,22 @@ export function AdminDashboard() {
   }, [isAdmin, adminUser, fetchData]);
 
   // Real-time activity: last 10 teams by updatedAt
+  // NOTE: uses SDK token — first emission may come from local IndexedDB cache
+  //       (fromCache: true) rather than the server. Server read requires admin
+  //       token to have propagated; check logs to distinguish cache vs server.
   useEffect(() => {
-    if (!isAdmin) return;
+    if (!isAdmin || !adminUser) return;
     console.log('🔍 Tentative: onSnapshot collection(teams) orderBy updatedAt limit 10');
     const q = query(collection(db, 'teams'), orderBy('updatedAt', 'desc'), limit(10));
-    const unsub = onSnapshot(q, (snap) => {
-      console.log('✅ Réussi: onSnapshot teams —', snap.docs.length, 'docs');
+    const unsub = onSnapshot(q, { includeMetadataChanges: true }, (snap) => {
+      const fromCache = snap.metadata.fromCache;
+      const hasPending = snap.metadata.hasPendingWrites;
+      console.log(
+        fromCache ? '📦 onSnapshot teams — depuis le CACHE local' : '🌐 onSnapshot teams — depuis le SERVEUR',
+        snap.docs.length, 'docs', { fromCache, hasPendingWrites: hasPending }
+      );
+      // Ignore stale cache emissions — only update state with server data
+      if (fromCache) return;
       const items: ActivityItem[] = snap.docs.map(d => ({
         id: d.id,
         teamName: d.data().name || d.id,
@@ -348,9 +358,9 @@ export function AdminDashboard() {
         at: d.data().updatedAt || d.data().createdAt || '',
       }));
       setActivity(items);
-    }, (err) => { console.error('❌ onSnapshot teams error:', err); });
+    }, (err) => { console.error('❌ onSnapshot teams error (server):', err); });
     return unsub;
-  }, [isAdmin]);
+  }, [isAdmin, adminUser]);
 
   // ── Derived stats ──────────────────────────────────────────────────────────
 
