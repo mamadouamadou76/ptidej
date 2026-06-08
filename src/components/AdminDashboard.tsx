@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
-  collection, doc, getDoc, getDocs, setDoc,
+  collection, doc, getDoc, getDocs, setDoc, updateDoc,
   query, orderBy, limit, onSnapshot, deleteDoc
 } from 'firebase/firestore';
 import { db } from '../utils/firebase';
@@ -9,7 +9,7 @@ import { useAdmin } from './AdminContext';
 import {
   Coffee, Users, Building2, Activity, Search, ChevronLeft, ChevronRight,
   LogOut, Shield, RefreshCw, Trash2, AlertTriangle, X,
-  TrendingUp, UserCheck, Calendar, Crown, Eye, ExternalLink, FileText
+  TrendingUp, UserCheck, Calendar, Crown, Eye, ExternalLink, FileText, Ban
 } from 'lucide-react';
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -21,6 +21,7 @@ interface UserRecord {
   photoURL?: string;
   createdAt: string;
   activeTeamId?: string;
+  disabled?: boolean;
 }
 
 interface TeamRecord {
@@ -245,6 +246,8 @@ export function AdminDashboard() {
   const [userPage, setUserPage] = useState(0);
   const [teamPage, setTeamPage] = useState(0);
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
+  const [confirmDeleteUser, setConfirmDeleteUser] = useState<string | null>(null);
+  const [ownerFilter, setOwnerFilter] = useState<string | null>(null);
 
   // ── Data fetching ──────────────────────────────────────────────────────────
 
@@ -287,6 +290,7 @@ export function AdminDashboard() {
           photoURL: p.photoURL,
           createdAt: p.createdAt || '',
           activeTeamId: teamList.find(t => t.ownerId === uid)?.id ?? '',
+          disabled: p.disabled === true,
         });
       }
       setUsers(userList);
@@ -337,9 +341,10 @@ export function AdminDashboard() {
     u.email.toLowerCase().includes(search.toLowerCase())
   );
   const filteredTeams = teams.filter(t =>
-    !search ||
-    t.name.toLowerCase().includes(search.toLowerCase()) ||
-    t.ownerEmail.toLowerCase().includes(search.toLowerCase())
+    (!ownerFilter || t.ownerId === ownerFilter) &&
+    (!search ||
+      t.name.toLowerCase().includes(search.toLowerCase()) ||
+      t.ownerEmail.toLowerCase().includes(search.toLowerCase()))
   );
 
   const userPages = Math.max(1, Math.ceil(filteredUsers.length / PAGE_SIZE));
@@ -356,6 +361,33 @@ export function AdminDashboard() {
       setConfirmDelete(null);
     } catch (err) {
       console.error('Delete team error:', err);
+    }
+  };
+
+  // ── User moderation ────────────────────────────────────────────────────────
+
+  const handleToggleDisable = async (uid: string, currentDisabled: boolean) => {
+    try {
+      await updateDoc(doc(db, 'users', uid, 'public', 'profile'), { disabled: !currentDisabled });
+      setUsers(prev => prev.map(u => u.uid === uid ? { ...u, disabled: !currentDisabled } : u));
+    } catch (err) {
+      console.error('Toggle disable error:', err);
+    }
+  };
+
+  const handleDeleteUser = async (uid: string) => {
+    try {
+      await deleteDoc(doc(db, 'users', uid, 'public', 'profile'));
+      await deleteDoc(doc(db, 'users', uid, 'private', 'info'));
+      const userTeams = teams.filter(t => t.ownerId === uid);
+      for (const t of userTeams) {
+        await deleteDoc(doc(db, 'teams', t.id));
+      }
+      setUsers(prev => prev.filter(u => u.uid !== uid));
+      setTeams(prev => prev.filter(t => t.ownerId !== uid));
+      setConfirmDeleteUser(null);
+    } catch (err) {
+      console.error('Delete user error:', err);
     }
   };
 
@@ -590,7 +622,7 @@ export function AdminDashboard() {
                           initial={{ opacity: 0 }}
                           animate={{ opacity: 1 }}
                           transition={{ delay: i * 0.03 }}
-                          className="border-b border-zinc-800 last:border-0 hover:bg-zinc-800/40 transition-colors"
+                          className={`border-b border-zinc-800 last:border-0 transition-colors ${user.disabled ? 'opacity-50 bg-rose-950/10' : 'hover:bg-zinc-800/40'}`}
                         >
                           <td className="px-5 py-3">
                             <div className="flex items-center gap-3 min-w-0">
@@ -600,7 +632,15 @@ export function AdminDashboard() {
                                 className="w-8 h-8 rounded-lg flex-shrink-0 bg-zinc-800"
                               />
                               <div className="min-w-0">
-                                <p className="text-sm font-semibold truncate">{user.displayName}</p>
+                                <div className="flex items-center gap-2">
+                                  <p className="text-sm font-semibold truncate">{user.displayName}</p>
+                                  {user.disabled && (
+                                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-rose-500/15 border border-rose-500/30 text-rose-400 text-[9px] font-bold rounded-full flex-shrink-0">
+                                      <Ban className="w-2.5 h-2.5" />
+                                      Désactivé
+                                    </span>
+                                  )}
+                                </div>
                                 <p className="text-xs text-zinc-500 truncate">{user.email || '—'}</p>
                               </div>
                             </div>
@@ -622,16 +662,54 @@ export function AdminDashboard() {
                             )}
                           </td>
                           <td className="px-5 py-3 text-right">
-                            <button
-                              onClick={() => {
-                                const url = `https://console.firebase.google.com/u/0/project/_/authentication/users?search=${encodeURIComponent(user.email)}`;
-                                window.open(url, '_blank');
-                              }}
-                              className="p-1.5 rounded-lg border border-zinc-700 hover:border-zinc-500 text-zinc-500 hover:text-white transition-all"
-                              title="Voir dans Firebase Console"
-                            >
-                              <ExternalLink className="w-3 h-3" />
-                            </button>
+                            <div className="flex items-center justify-end gap-1">
+                              {/* Voir équipes */}
+                              <button
+                                onClick={() => { setOwnerFilter(user.uid); setTab('teams'); setSearch(''); }}
+                                className="p-1.5 rounded-lg border border-zinc-700 hover:border-blue-500 text-zinc-500 hover:text-blue-400 transition-all"
+                                title="Voir les équipes"
+                              >
+                                <Eye className="w-3.5 h-3.5" />
+                              </button>
+                              {/* Désactiver / Réactiver */}
+                              <button
+                                onClick={() => handleToggleDisable(user.uid, !!user.disabled)}
+                                className={`p-1.5 rounded-lg border transition-all ${
+                                  user.disabled
+                                    ? 'border-emerald-700 hover:border-emerald-400 text-emerald-600 hover:text-emerald-400'
+                                    : 'border-zinc-700 hover:border-amber-500 text-zinc-500 hover:text-amber-400'
+                                }`}
+                                title={user.disabled ? 'Réactiver le compte' : 'Désactiver le compte'}
+                              >
+                                <Ban className="w-3.5 h-3.5" />
+                              </button>
+                              {/* Supprimer */}
+                              {confirmDeleteUser === user.uid ? (
+                                <div className="flex items-center gap-1">
+                                  <span className="text-[10px] text-rose-400">Confirmer ?</span>
+                                  <button
+                                    onClick={() => handleDeleteUser(user.uid)}
+                                    className="px-2 py-1 bg-rose-600 hover:bg-rose-700 text-white text-[10px] font-bold rounded-lg transition-colors"
+                                  >
+                                    Oui
+                                  </button>
+                                  <button
+                                    onClick={() => setConfirmDeleteUser(null)}
+                                    className="px-2 py-1 bg-zinc-700 hover:bg-zinc-600 text-white text-[10px] font-bold rounded-lg transition-colors"
+                                  >
+                                    Non
+                                  </button>
+                                </div>
+                              ) : (
+                                <button
+                                  onClick={() => setConfirmDeleteUser(user.uid)}
+                                  className="p-1.5 rounded-lg border border-zinc-700 hover:border-rose-500 text-zinc-500 hover:text-rose-400 transition-all"
+                                  title="Supprimer le compte"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              )}
+                            </div>
                           </td>
                         </motion.tr>
                       ))}
@@ -676,11 +754,24 @@ export function AdminDashboard() {
               exit={{ opacity: 0 }}
               className="bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden"
             >
-              <div className="px-5 py-4 border-b border-zinc-800 flex items-center justify-between">
-                <h2 className="font-bold text-sm">{filteredTeams.length} équipe{filteredTeams.length !== 1 ? 's' : ''}</h2>
+              <div className="px-5 py-4 border-b border-zinc-800 flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3 min-w-0">
+                  <h2 className="font-bold text-sm flex-shrink-0">{filteredTeams.length} équipe{filteredTeams.length !== 1 ? 's' : ''}</h2>
+                  {ownerFilter && (
+                    <button
+                      onClick={() => setOwnerFilter(null)}
+                      className="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-500/10 border border-blue-500/30 text-blue-400 text-[10px] font-bold rounded-full hover:bg-rose-500/10 hover:border-rose-500/30 hover:text-rose-400 transition-all"
+                      title="Supprimer le filtre"
+                    >
+                      <Eye className="w-2.5 h-2.5" />
+                      Filtré par owner
+                      <X className="w-2.5 h-2.5" />
+                    </button>
+                  )}
+                </div>
                 <button
                   onClick={fetchData}
-                  className="p-1.5 rounded-lg border border-zinc-700 hover:border-zinc-500 text-zinc-500 hover:text-white transition-all"
+                  className="p-1.5 rounded-lg border border-zinc-700 hover:border-zinc-500 text-zinc-500 hover:text-white transition-all flex-shrink-0"
                 >
                   <RefreshCw className="w-3.5 h-3.5" />
                 </button>
