@@ -9,7 +9,7 @@ import { useAdmin } from './AdminContext';
 import {
   Coffee, Users, Building2, Activity, Search, ChevronLeft, ChevronRight,
   LogOut, Shield, RefreshCw, Trash2, AlertTriangle, X,
-  TrendingUp, UserCheck, Calendar, Crown, Eye, ExternalLink, FileText, Ban
+  TrendingUp, UserCheck, Calendar, Crown, Eye, ExternalLink, FileText, Ban, Mail, Send
 } from 'lucide-react';
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -241,13 +241,18 @@ export function AdminDashboard() {
   const [activity, setActivity] = useState<ActivityItem[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const [tab, setTab] = useState<'overview' | 'users' | 'teams' | 'content'>('overview');
+  const [tab, setTab] = useState<'overview' | 'users' | 'teams' | 'content' | 'reports'>('overview');
   const [search, setSearch] = useState('');
   const [userPage, setUserPage] = useState(0);
   const [teamPage, setTeamPage] = useState(0);
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
   const [confirmDeleteUser, setConfirmDeleteUser] = useState<string | null>(null);
   const [ownerFilter, setOwnerFilter] = useState<string | null>(null);
+
+  const [statsData, setStatsData] = useState<{ date: string; connexions: number; nouveaux: number }[]>([]);
+  const [statsLoading, setStatsLoading] = useState(false);
+  const [sendingReport, setSendingReport] = useState(false);
+  const [reportSent, setReportSent] = useState(false);
 
   // ── Data fetching ──────────────────────────────────────────────────────────
 
@@ -408,6 +413,51 @@ export function AdminDashboard() {
     setConfirmDeleteUser(null);
   };
 
+  // ── Stats / reports ────────────────────────────────────────────────────────
+
+  const fetchStats = useCallback(async () => {
+    setStatsLoading(true);
+    const days: { date: string; connexions: number; nouveaux: number }[] = [];
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      const dateStr = d.toISOString().slice(0, 10);
+      try {
+        const snap = await getDoc(doc(db, 'stats', dateStr));
+        const data = snap.exists() ? snap.data() : {};
+        days.push({ date: dateStr, connexions: data.connexions ?? 0, nouveaux: data.nouveaux ?? 0 });
+      } catch {
+        days.push({ date: dateStr, connexions: 0, nouveaux: 0 });
+      }
+    }
+    setStatsData(days);
+    setStatsLoading(false);
+  }, []);
+
+  useEffect(() => {
+    if (tab === 'reports' && statsData.length === 0) fetchStats();
+  }, [tab, fetchStats, statsData.length]);
+
+  const sendReport = async () => {
+    if (!adminUser) return;
+    setSendingReport(true);
+    setReportSent(false);
+    try {
+      const token = await adminUser.getIdToken();
+      const res = await fetch('https://ptidej.fr/api/admin-report', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token, stats: statsData }),
+      });
+      if (!res.ok) throw new Error('API error');
+      setReportSent(true);
+    } catch (e) {
+      console.error('sendReport error:', e);
+    } finally {
+      setSendingReport(false);
+    }
+  };
+
   // ── Format helpers ─────────────────────────────────────────────────────────
 
   const formatDate = (iso: string) => {
@@ -481,7 +531,7 @@ export function AdminDashboard() {
 
         {/* ── Tabs ── */}
         <div className="flex items-center gap-1 bg-zinc-900 border border-zinc-800 rounded-xl p-1 w-fit flex-wrap">
-          {(['overview', 'users', 'teams', 'content'] as const).map(t => (
+          {(['overview', 'users', 'teams', 'content', 'reports'] as const).map(t => (
             <button
               key={t}
               onClick={() => setTab(t)}
@@ -491,13 +541,13 @@ export function AdminDashboard() {
                   : 'text-zinc-500 hover:text-zinc-300'
               }`}
             >
-              {t === 'overview' ? "Vue d'ensemble" : t === 'users' ? 'Utilisateurs' : t === 'teams' ? 'Équipes' : 'Contenu'}
+              {t === 'overview' ? "Vue d'ensemble" : t === 'users' ? 'Utilisateurs' : t === 'teams' ? 'Équipes' : t === 'content' ? 'Contenu' : 'Rapports'}
             </button>
           ))}
         </div>
 
         {/* ── Search bar (shared for users/teams tabs) ── */}
-        {tab !== 'overview' && tab !== 'content' && (
+        {tab !== 'overview' && tab !== 'content' && tab !== 'reports' && (
           <div className="relative max-w-sm">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-600" />
             <input
@@ -906,6 +956,78 @@ export function AdminDashboard() {
 
           {/* ── CONTENT tab ── */}
           {tab === 'content' && <ContentTab />}
+
+          {/* ── REPORTS tab ── */}
+          {tab === 'reports' && (
+            <motion.div
+              key="reports"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="space-y-4"
+            >
+              <div className="bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden">
+                <div className="px-5 py-4 border-b border-zinc-800 flex items-center justify-between gap-3 flex-wrap">
+                  <div className="flex items-center gap-2">
+                    <Mail className="w-4 h-4 text-amber-500" />
+                    <h2 className="text-sm font-bold text-white">Statistiques — 7 derniers jours</h2>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={fetchStats}
+                      disabled={statsLoading}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-zinc-700 text-xs text-zinc-400 hover:text-white hover:border-zinc-500 disabled:opacity-40 transition-all"
+                    >
+                      <RefreshCw className={`w-3 h-3 ${statsLoading ? 'animate-spin' : ''}`} />
+                      Actualiser
+                    </button>
+                    <button
+                      onClick={sendReport}
+                      disabled={sendingReport || statsData.length === 0}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-xs font-bold text-black disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                    >
+                      <Send className="w-3 h-3" />
+                      {sendingReport ? 'Envoi…' : reportSent ? 'Envoyé ✓' : 'Envoyer par email'}
+                    </button>
+                  </div>
+                </div>
+
+                {statsLoading ? (
+                  <div className="px-5 py-10 text-center text-zinc-600 text-sm">Chargement…</div>
+                ) : statsData.length === 0 ? (
+                  <div className="px-5 py-10 text-center text-zinc-600 text-sm">Aucune donnée disponible.</div>
+                ) : (
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="text-zinc-500 text-xs">
+                        <th className="px-5 py-3 text-left font-semibold">Date</th>
+                        <th className="px-5 py-3 text-right font-semibold">Connexions</th>
+                        <th className="px-5 py-3 text-right font-semibold">Nouveaux</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {statsData.map((row, i) => (
+                        <tr key={row.date} className={i % 2 === 0 ? 'bg-zinc-900/50' : ''}>
+                          <td className="px-5 py-2.5 text-zinc-300 font-mono text-xs">{row.date}</td>
+                          <td className="px-5 py-2.5 text-right text-white font-bold tabular-nums">{row.connexions}</td>
+                          <td className="px-5 py-2.5 text-right text-amber-400 font-bold tabular-nums">{row.nouveaux}</td>
+                        </tr>
+                      ))}
+                      <tr className="border-t border-zinc-800">
+                        <td className="px-5 py-3 text-zinc-400 text-xs font-bold">Total</td>
+                        <td className="px-5 py-3 text-right text-white font-bold tabular-nums">
+                          {statsData.reduce((s, r) => s + r.connexions, 0)}
+                        </td>
+                        <td className="px-5 py-3 text-right text-amber-400 font-bold tabular-nums">
+                          {statsData.reduce((s, r) => s + r.nouveaux, 0)}
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                )}
+              </div>
+            </motion.div>
+          )}
 
         </AnimatePresence>
       </div>

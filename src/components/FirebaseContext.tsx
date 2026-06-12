@@ -9,14 +9,15 @@ import {
   onAuthStateChanged,
   updateProfile
 } from 'firebase/auth';
-import { 
-  doc, 
-  getDoc, 
+import {
+  doc,
+  getDoc,
   getDocFromServer,
-  setDoc, 
+  setDoc,
   updateDoc,
   collection,
-  onSnapshot
+  onSnapshot,
+  increment
 } from 'firebase/firestore';
 import { auth, db, OperationType, handleFirestoreError } from '../utils/firebase';
 import { Colleague, Absence, ShiftSettings, ManualOverride } from '../types';
@@ -123,8 +124,9 @@ export function FirebaseProvider({
     
     try {
       const profileDoc = await getDoc(doc(db, profilePath));
+      const isFirstLogin = !profileDoc.exists();
       let currentActiveTeam = '';
-      
+
       if (!profileDoc.exists()) {
         // Create full specs on first time registration
         const newProfile: UserProfile = {
@@ -148,7 +150,12 @@ export function FirebaseProvider({
         currentActiveTeam = data.activeTeamId || '';
         setIsNewUser(false);
       }
-      
+
+      // Track daily connexions (fire-and-forget)
+      const today = new Date().toISOString().slice(0, 10);
+      const statsPayload = { connexions: increment(1), ...(isFirstLogin ? { nouveaux: increment(1) } : {}) };
+      setDoc(doc(db, 'stats', today), statsPayload, { merge: true }).catch(() => {});
+
       setActiveTeamId(currentActiveTeam);
 
       if (currentActiveTeam) {

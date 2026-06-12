@@ -69,6 +69,12 @@ service cloud.firestore {
       allow write: if isSignedIn() && request.auth.token.admin == true;
     }
 
+    // Stats (connexions & new users per day)
+    match /stats/{date} {
+      allow read: if request.auth != null && request.auth.token.admin == true;
+      allow create, update: if isSignedIn();
+    }
+
     // Admin collectionGroup access
     match /{path=**}/public/profile {
       allow read: if request.auth != null && request.auth.token.admin == true;
