@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from './FirebaseContext';
 import { Coffee, Mail, Lock, User, LogIn, ChevronRight, AlertCircle, RefreshCw } from 'lucide-react';
 
@@ -15,7 +15,14 @@ export function AuthView({ onClose }: AuthViewProps) {
   const [name, setName] = useState('');
   
   const [loading, setLoading] = useState(false);
+  const [googleRedirectPending, setGoogleRedirectPending] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (sessionStorage.getItem('google_redirect_pending')) {
+      setGoogleRedirectPending(true);
+    }
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -189,10 +196,15 @@ export function AuthView({ onClose }: AuthViewProps) {
         {/* Google OAuth Login Button */}
         <button
           onClick={handleGoogleLogin}
-          disabled={loading}
+          disabled={loading || googleRedirectPending}
           className="w-full bg-white hover:bg-stone-50 text-stone-700 font-bold py-3 px-4 border border-stone-200 rounded-xl shadow-xs hover:shadow-sm active:scale-98 transition-all flex items-center justify-center gap-2.5 text-xs select-none disabled:opacity-50"
         >
-          {loading ? (
+          {googleRedirectPending ? (
+            <>
+              <RefreshCw className="w-4 h-4 animate-spin text-stone-400" />
+              <span>Connexion Google en cours…</span>
+            </>
+          ) : loading ? (
             <RefreshCw className="w-4 h-4 animate-spin text-stone-400" />
           ) : (
             <>

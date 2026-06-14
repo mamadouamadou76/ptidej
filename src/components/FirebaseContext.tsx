@@ -1,11 +1,12 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { 
-  User, 
-  signInWithPopup, 
-  GoogleAuthProvider, 
-  signInWithEmailAndPassword, 
-  createUserWithEmailAndPassword, 
-  signOut, 
+import {
+  User,
+  signInWithRedirect,
+  getRedirectResult,
+  GoogleAuthProvider,
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  signOut,
   onAuthStateChanged,
   updateProfile
 } from 'firebase/auth';
@@ -101,7 +102,19 @@ export function FirebaseProvider({
     testConnection();
   }, []);
 
-  // 2. Track Firebase Auth users changes
+  // 2. Recover result after Google redirect sign-in
+  useEffect(() => {
+    getRedirectResult(auth)
+      .then((result) => {
+        if (result) sessionStorage.removeItem('google_redirect_pending');
+      })
+      .catch((err) => {
+        console.error('Google redirect sign-in failed:', err);
+        sessionStorage.removeItem('google_redirect_pending');
+      });
+  }, []);
+
+  // 3. Track Firebase Auth users changes
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       setUser(currentUser);
@@ -117,7 +130,7 @@ export function FirebaseProvider({
     return unsubscribe;
   }, []);
 
-  // 3. Sync User Profile from firestore database
+  // 4. Sync User Profile from firestore database
   const syncUserProfile = async (currentUser: User) => {
     const profilePath = `users/${currentUser.uid}/public/profile`;
     const infoPath = `users/${currentUser.uid}/private/info`;
@@ -176,7 +189,7 @@ export function FirebaseProvider({
     }
   };
 
-  // 4. Real-time active team listener
+  // 5. Real-time active team listener
   useEffect(() => {
     if (!user || !activeTeamId) {
       setTeamName(null);
@@ -244,9 +257,12 @@ export function FirebaseProvider({
   const signInWithGoogle = async () => {
     const provider = new GoogleAuthProvider();
     try {
-      await signInWithPopup(auth, provider);
+      sessionStorage.setItem('google_redirect_pending', 'true');
+      await signInWithRedirect(auth, provider);
     } catch (err) {
+      sessionStorage.removeItem('google_redirect_pending');
       console.error('Google Sign-In Failed:', err);
+      throw err;
     }
   };
 
