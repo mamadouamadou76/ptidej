@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { ShiftSettings } from '../types';
 import {
   Calendar, RotateCcw, Check, RefreshCw, AlertTriangle,
-  HelpCircle, Sparkles, Clock, Hammer, Clipboard, Mail, Bug
+  HelpCircle, Sparkles, Clock, Hammer, Clipboard, Mail, Bug, Send
 } from 'lucide-react';
 import { getMonday, formatLocalDate, getISOWeekNumber } from '../utils/scheduler';
 
@@ -13,6 +13,92 @@ interface SettingsViewProps {
   onClearAll: () => void;
   teamCode?: string | null;
   readOnly?: boolean;
+}
+
+function ContactForm() {
+  const [type, setType] = useState<'bug' | 'message'>('bug');
+  const [message, setMessage] = useState('');
+  const [sent, setSent] = useState(false);
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!message.trim()) return;
+    const subject = type === 'bug'
+      ? "P'tit Déj — Signalement de bug"
+      : "P'tit Déj — Message";
+    const body = message.trim();
+    const mailto = `mailto:mamadouamadou76@gmail.com?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+    window.open(mailto, '_blank');
+    setSent(true);
+    setTimeout(() => { setSent(false); setMessage(''); }, 3000);
+  };
+
+  return (
+    <div className="bg-white border border-stone-200/80 p-4 rounded-2xl shadow-xs space-y-3">
+      <h3 className="font-bold text-stone-900 text-sm flex items-center gap-2">
+        <Mail className="w-4 h-4 text-amber-600" />
+        <span>Nous contacter</span>
+      </h3>
+
+      {/* Type toggle */}
+      <div className="flex gap-2">
+        <button
+          type="button"
+          onClick={() => setType('bug')}
+          className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl border text-xs font-bold transition-all ${
+            type === 'bug'
+              ? 'border-rose-400 bg-rose-50 text-rose-700'
+              : 'border-stone-200 bg-stone-50 text-stone-400 hover:text-stone-600'
+          }`}
+        >
+          <Bug className="w-3.5 h-3.5" />
+          Signaler un bug
+        </button>
+        <button
+          type="button"
+          onClick={() => setType('message')}
+          className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl border text-xs font-bold transition-all ${
+            type === 'message'
+              ? 'border-amber-400 bg-amber-50 text-amber-700'
+              : 'border-stone-200 bg-stone-50 text-stone-400 hover:text-stone-600'
+          }`}
+        >
+          <Mail className="w-3.5 h-3.5" />
+          Message
+        </button>
+      </div>
+
+      {/* Form */}
+      <form onSubmit={handleSubmit} className="space-y-2">
+        <textarea
+          value={message}
+          onChange={(e) => setMessage(e.target.value)}
+          placeholder={type === 'bug'
+            ? 'Décrivez le problème rencontré, les étapes pour le reproduire…'
+            : 'Votre suggestion, question ou retour…'}
+          rows={4}
+          className="w-full px-3.5 py-2.5 bg-stone-50 border border-stone-200 rounded-xl text-xs text-stone-900 placeholder-stone-400 focus:outline-none focus:ring-1 focus:ring-amber-500 focus:bg-white resize-none transition-all"
+        />
+        <button
+          type="submit"
+          disabled={!message.trim() || sent}
+          className={`w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-bold transition-all disabled:opacity-40 ${
+            sent
+              ? 'border border-emerald-300 bg-emerald-50 text-emerald-700'
+              : type === 'bug'
+              ? 'border border-rose-300 bg-rose-50 hover:bg-rose-100 text-rose-700'
+              : 'border border-amber-300 bg-amber-50 hover:bg-amber-100 text-amber-700'
+          }`}
+        >
+          {sent ? (
+            <><Check className="w-4 h-4" /> Merci, votre messagerie s'est ouverte !</>
+          ) : (
+            <><Send className="w-3.5 h-3.5" /> Envoyer</>
+          )}
+        </button>
+      </form>
+    </div>
+  );
 }
 
 export function SettingsView({
@@ -341,31 +427,7 @@ export function SettingsView({
       </div>
 
       {/* Contact & Bug Report */}
-      <div className="bg-white border border-stone-200/80 p-4 rounded-2xl shadow-xs space-y-3">
-        <h3 className="font-bold text-stone-900 text-sm flex items-center gap-2">
-          <Mail className="w-4 h-4 text-amber-600" />
-          <span>Nous contacter</span>
-        </h3>
-        <p className="text-xs text-stone-500 leading-relaxed">
-          Une idée d'amélioration, un bug à signaler ou une question ? Envoyez-nous un message directement.
-        </p>
-        <div className="space-y-2 pt-1">
-          <a
-            href="mailto:mamadouamadou76@gmail.com?subject=P%27tit%20D%C3%A9j%20%E2%80%94%20Signalement%20de%20bug&body=D%C3%A9crivez%20le%20probl%C3%A8me%20rencontr%C3%A9%20%3A%0A%0A"
-            className="w-full flex items-center justify-center gap-2 py-2.5 border border-rose-200 hover:border-rose-400 text-rose-700 hover:text-rose-900 bg-rose-50/30 hover:bg-rose-50/60 rounded-xl text-xs font-bold transition-all"
-          >
-            <Bug className="w-4 h-4 text-rose-500" />
-            <span>Signaler un bug</span>
-          </a>
-          <a
-            href="mailto:mamadouamadou76@gmail.com?subject=P%27tit%20D%C3%A9j%20%E2%80%94%20Suggestion&body=Votre%20message%20%3A%0A%0A"
-            className="w-full flex items-center justify-center gap-2 py-2.5 border border-amber-200 hover:border-amber-400 text-amber-800 hover:text-amber-900 bg-amber-50/30 hover:bg-amber-50/60 rounded-xl text-xs font-bold transition-all"
-          >
-            <Mail className="w-4 h-4 text-amber-600" />
-            <span>Envoyer un message</span>
-          </a>
-        </div>
-      </div>
+      <ContactForm />
 
       {/* Outils & Reset */}
       <div className="bg-white border border-stone-200/80 p-4 rounded-2xl shadow-xs space-y-3">
