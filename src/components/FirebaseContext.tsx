@@ -108,17 +108,31 @@ export function FirebaseProvider({
 
   // 2. Recover redirect result + track auth state (merged to fix race condition)
   useEffect(() => {
-    // Race condition fix: onAuthStateChanged can fire with null BEFORE
-    // getRedirectResult processes the redirect token. We defer the null branch
-    // until the redirect check has settled.
+    // Three flags to handle the race between getRedirectResult and onAuthStateChanged:
+    // - redirectChecked: getRedirectResult has settled (success, error, or null)
+    // - redirectSucceeded: getRedirectResult returned an actual user
+    // - pendingNullUser: onAuthStateChanged fired null before redirectChecked was true
+    //
+    // The bug without redirectSucceeded: getRedirectResult resolves with a user,
+    // but .finally() blindly applies null state (loading=false, user=null) because
+    // pendingNullUser=true, showing the login page before onAuthStateChanged(user) fires.
     let redirectChecked = false;
+    let redirectSucceeded = false;
     let pendingNullUser = false;
+
+    const applyNullState = () => {
+      setProfile(null);
+      setActiveTeamId(null);
+      setTeamName(null);
+      setLoading(false);
+    };
 
     console.log('🔄 Checking redirect result...');
 
     getRedirectResult(auth)
       .then((result) => {
         console.log('✅ Redirect result:', result);
+        if (result?.user) redirectSucceeded = true;
       })
       .catch((err) => {
         console.log('❌ Redirect error:', err);
@@ -127,12 +141,10 @@ export function FirebaseProvider({
         sessionStorage.removeItem('google_redirect_pending');
         setGoogleRedirectPending(false);
         redirectChecked = true;
-        // onAuthStateChanged already fired null while we were waiting — apply it now
-        if (pendingNullUser) {
-          setProfile(null);
-          setActiveTeamId(null);
-          setTeamName(null);
-          setLoading(false);
+        // Only show login if redirect did NOT produce a user AND auth state is null.
+        // If redirect succeeded, wait for onAuthStateChanged to fire with the user.
+        if (pendingNullUser && !redirectSucceeded) {
+          applyNullState();
         }
       });
 
@@ -142,15 +154,14 @@ export function FirebaseProvider({
       if (currentUser) {
         await syncUserProfile(currentUser);
       } else {
-        if (redirectChecked) {
-          setProfile(null);
-          setActiveTeamId(null);
-          setTeamName(null);
-          setLoading(false);
-        } else {
-          // Redirect not yet checked — defer loading=false to avoid flash
+        if (!redirectChecked) {
+          // Redirect not yet settled — defer to avoid showing login too early
           pendingNullUser = true;
+        } else if (!redirectSucceeded) {
+          // Redirect settled with no user (no redirect, cancelled, or error)
+          applyNullState();
         }
+        // If redirectSucceeded: onAuthStateChanged(user) is coming — stay on loading
       }
     });
 
