@@ -7,7 +7,7 @@ interface AuthViewProps {
 }
 
 export function AuthView({ onClose }: AuthViewProps) {
-  const { signInWithGoogle, signInWithEmail, signUpWithEmail, googleRedirectPending } = useAuth();
+  const { signInWithGoogle, signInWithEmail, signUpWithEmail } = useAuth();
   
   const [isSignUp, setIsSignUp] = useState(false);
   const [email, setEmail] = useState('');
@@ -65,7 +65,15 @@ export function AuthView({ onClose }: AuthViewProps) {
       if (onClose) onClose();
     } catch (err: any) {
       console.error(err);
-      setErrorMessage("Erreur de connexion avec Google.");
+      if (err.code === 'auth/popup-blocked') {
+        setErrorMessage("Le popup de connexion a été bloqué. Autorisez les popups pour ce site dans votre navigateur.");
+      } else if (err.code === 'auth/popup-closed-by-user' || err.code === 'auth/cancelled-popup-request') {
+        setErrorMessage(null);
+      } else if (err.code === 'auth/unauthorized-domain') {
+        setErrorMessage("Ce domaine n'est pas autorisé pour la connexion Google. Contactez l'administrateur.");
+      } else {
+        setErrorMessage("Erreur de connexion avec Google. Veuillez réessayer.");
+      }
     } finally {
       setLoading(false);
     }
@@ -179,15 +187,10 @@ export function AuthView({ onClose }: AuthViewProps) {
         {/* Google OAuth Login Button */}
         <button
           onClick={handleGoogleLogin}
-          disabled={loading || googleRedirectPending}
+          disabled={loading}
           className="w-full bg-white hover:bg-stone-50 text-stone-700 font-bold py-3 px-4 border border-stone-200 rounded-xl shadow-xs hover:shadow-sm active:scale-98 transition-all flex items-center justify-center gap-2.5 text-xs select-none disabled:opacity-50"
         >
-          {googleRedirectPending ? (
-            <>
-              <RefreshCw className="w-4 h-4 animate-spin text-stone-400" />
-              <span>Connexion Google en cours…</span>
-            </>
-          ) : loading ? (
+          {loading ? (
             <RefreshCw className="w-4 h-4 animate-spin text-stone-400" />
           ) : (
             <>

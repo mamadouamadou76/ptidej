@@ -1,9 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import {
   User,
-  signInWithRedirect,
-  getRedirectResult,
-  browserPopupRedirectResolver,
+  signInWithPopup,
   GoogleAuthProvider,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
@@ -43,7 +41,6 @@ interface FirebaseContextType {
   teamName: string | null;
   isSyncing: boolean;
   currentUserRole: UserRole | null;
-  googleRedirectPending: boolean;
 
   signInWithGoogle: () => Promise<void>;
   signInWithEmail: (email: string, password: string) => Promise<void>;
@@ -88,9 +85,6 @@ export function FirebaseProvider({
   const [isSyncing, setIsSyncing] = useState(false);
   const [currentUserRole, setCurrentUserRole] = useState<UserRole | null>(null);
   const [isNewUser, setIsNewUser] = useState(false);
-  const [googleRedirectPending, setGoogleRedirectPending] = useState(
-    () => !!sessionStorage.getItem('google_redirect_pending')
-  );
 
   // 1. Mandatory Core Constraint: test the connection upon boot using doc get from server
   useEffect(() => {
@@ -107,65 +101,19 @@ export function FirebaseProvider({
     testConnection();
   }, []);
 
-  // 2. Recover redirect result + track auth state (merged to fix race condition)
+  // 2. Track Firebase Auth state changes
   useEffect(() => {
-    // Three flags to handle the race between getRedirectResult and onAuthStateChanged:
-    // - redirectChecked: getRedirectResult has settled (success, error, or null)
-    // - redirectSucceeded: getRedirectResult returned an actual user
-    // - pendingNullUser: onAuthStateChanged fired null before redirectChecked was true
-    //
-    // The bug without redirectSucceeded: getRedirectResult resolves with a user,
-    // but .finally() blindly applies null state (loading=false, user=null) because
-    // pendingNullUser=true, showing the login page before onAuthStateChanged(user) fires.
-    let redirectChecked = false;
-    let redirectSucceeded = false;
-    let pendingNullUser = false;
-
-    const applyNullState = () => {
-      setProfile(null);
-      setActiveTeamId(null);
-      setTeamName(null);
-      setLoading(false);
-    };
-
-    console.log('🔄 Checking redirect result...');
-
-    getRedirectResult(auth, browserPopupRedirectResolver)
-      .then((result) => {
-        console.log('✅ Redirect result:', result);
-        if (result?.user) redirectSucceeded = true;
-      })
-      .catch((err) => {
-        console.log('❌ Redirect error:', err);
-      })
-      .finally(() => {
-        sessionStorage.removeItem('google_redirect_pending');
-        setGoogleRedirectPending(false);
-        redirectChecked = true;
-        // Only show login if redirect did NOT produce a user AND auth state is null.
-        // If redirect succeeded, wait for onAuthStateChanged to fire with the user.
-        if (pendingNullUser && !redirectSucceeded) {
-          applyNullState();
-        }
-      });
-
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
-      console.log('👤 onAuthStateChanged:', currentUser?.email ?? null);
       setUser(currentUser);
       if (currentUser) {
         await syncUserProfile(currentUser);
       } else {
-        if (!redirectChecked) {
-          // Redirect not yet settled — defer to avoid showing login too early
-          pendingNullUser = true;
-        } else if (!redirectSucceeded) {
-          // Redirect settled with no user (no redirect, cancelled, or error)
-          applyNullState();
-        }
-        // If redirectSucceeded: onAuthStateChanged(user) is coming — stay on loading
+        setProfile(null);
+        setActiveTeamId(null);
+        setTeamName(null);
+        setLoading(false);
       }
     });
-
     return unsubscribe;
   }, []);
 
@@ -296,10 +244,8 @@ export function FirebaseProvider({
   const signInWithGoogle = async () => {
     const provider = new GoogleAuthProvider();
     try {
-      sessionStorage.setItem('google_redirect_pending', 'true');
-      await signInWithRedirect(auth, provider, browserPopupRedirectResolver);
-    } catch (err) {
-      sessionStorage.removeItem('google_redirect_pending');
+      await signInWithPopup(auth, provider);
+    } catch (err: any) {
       console.error('Google Sign-In Failed:', err);
       throw err;
     }
@@ -550,7 +496,6 @@ export function FirebaseProvider({
       teamName,
       isSyncing,
       currentUserRole,
-      googleRedirectPending,
       signInWithGoogle,
       signInWithEmail,
       signUpWithEmail,
