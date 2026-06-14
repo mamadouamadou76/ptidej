@@ -106,35 +106,58 @@ export function FirebaseProvider({
     testConnection();
   }, []);
 
-  // 2. Recover result after Google redirect sign-in
+  // 2. Recover redirect result + track auth state (merged to fix race condition)
   useEffect(() => {
+    // Race condition fix: onAuthStateChanged can fire with null BEFORE
+    // getRedirectResult processes the redirect token. We defer the null branch
+    // until the redirect check has settled.
+    let redirectChecked = false;
+    let pendingNullUser = false;
+
+    console.log('🔄 Checking redirect result...');
+
     getRedirectResult(auth)
+      .then((result) => {
+        console.log('✅ Redirect result:', result);
+      })
       .catch((err) => {
-        console.error('Google redirect sign-in failed:', err);
+        console.log('❌ Redirect error:', err);
       })
       .finally(() => {
         sessionStorage.removeItem('google_redirect_pending');
         setGoogleRedirectPending(false);
+        redirectChecked = true;
+        // onAuthStateChanged already fired null while we were waiting — apply it now
+        if (pendingNullUser) {
+          setProfile(null);
+          setActiveTeamId(null);
+          setTeamName(null);
+          setLoading(false);
+        }
       });
-  }, []);
 
-  // 3. Track Firebase Auth users changes
-  useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+      console.log('👤 onAuthStateChanged:', currentUser?.email ?? null);
       setUser(currentUser);
       if (currentUser) {
         await syncUserProfile(currentUser);
       } else {
-        setProfile(null);
-        setActiveTeamId(null);
-        setTeamName(null);
-        setLoading(false);
+        if (redirectChecked) {
+          setProfile(null);
+          setActiveTeamId(null);
+          setTeamName(null);
+          setLoading(false);
+        } else {
+          // Redirect not yet checked — defer loading=false to avoid flash
+          pendingNullUser = true;
+        }
       }
     });
+
     return unsubscribe;
   }, []);
 
-  // 4. Sync User Profile from firestore database
+  // 3. Sync User Profile from firestore database
   const syncUserProfile = async (currentUser: User) => {
     const profilePath = `users/${currentUser.uid}/public/profile`;
     const infoPath = `users/${currentUser.uid}/private/info`;
@@ -193,7 +216,7 @@ export function FirebaseProvider({
     }
   };
 
-  // 5. Real-time active team listener
+  // 4. Real-time active team listener
   useEffect(() => {
     if (!user || !activeTeamId) {
       setTeamName(null);
