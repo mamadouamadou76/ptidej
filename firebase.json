@@ -1,0 +1,22 @@
+{
+  "firestore": [
+    {
+      "database": "ai-studio-fce779ca-3f99-4909-b744-79951a23f490",
+      "rules": "firestore.rules"
+    }
+  ],
+  "auth": {
+    "providers": {
+      "googleSignIn": {
+        "oAuthBrandDisplayName": "P'tit Déj",
+        "supportEmail": "mamadouamadou76@gmail.com",
+        "authorizedRedirectUris": [
+          "https://app.ptidej.fr",
+          "https://openaiv1.firebaseapp.com",
+          "http://localhost:5173",
+          "http://localhost:4173"
+        ]
+      }
+    }
+  }
+}
