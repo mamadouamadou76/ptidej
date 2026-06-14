@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import emailjs from '@emailjs/browser';
 import { ShiftSettings } from '../types';
 import {
   Calendar, RotateCcw, Check, RefreshCw, AlertTriangle,
@@ -18,19 +19,35 @@ interface SettingsViewProps {
 function ContactForm() {
   const [type, setType] = useState<'bug' | 'message'>('bug');
   const [message, setMessage] = useState('');
+  const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!message.trim()) return;
-    const subject = type === 'bug'
-      ? "P'tit Déj — Signalement de bug"
-      : "P'tit Déj — Message";
-    const body = message.trim();
-    const mailto = `mailto:mamadouamadou76@gmail.com?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-    window.open(mailto, '_blank');
-    setSent(true);
-    setTimeout(() => { setSent(false); setMessage(''); }, 3000);
+    setSending(true);
+    setError(null);
+    try {
+      await emailjs.send(
+        import.meta.env.VITE_EMAILJS_SERVICE_ID,
+        import.meta.env.VITE_EMAILJS_TEMPLATE_ID,
+        {
+          type: type === 'bug' ? 'Signalement de bug' : 'Message',
+          message: message.trim(),
+          app: "P'tit Déj",
+        },
+        { publicKey: import.meta.env.VITE_EMAILJS_PUBLIC_KEY }
+      );
+      setSent(true);
+      setMessage('');
+      setTimeout(() => setSent(false), 4000);
+    } catch (err) {
+      console.error('EmailJS error:', err);
+      setError("Envoi échoué. Réessayez plus tard.");
+    } finally {
+      setSending(false);
+    }
   };
 
   return (
@@ -77,11 +94,15 @@ function ContactForm() {
             ? 'Décrivez le problème rencontré, les étapes pour le reproduire…'
             : 'Votre suggestion, question ou retour…'}
           rows={4}
-          className="w-full px-3.5 py-2.5 bg-stone-50 border border-stone-200 rounded-xl text-xs text-stone-900 placeholder-stone-400 focus:outline-none focus:ring-1 focus:ring-amber-500 focus:bg-white resize-none transition-all"
+          disabled={sending || sent}
+          className="w-full px-3.5 py-2.5 bg-stone-50 border border-stone-200 rounded-xl text-xs text-stone-900 placeholder-stone-400 focus:outline-none focus:ring-1 focus:ring-amber-500 focus:bg-white resize-none transition-all disabled:opacity-50"
         />
+        {error && (
+          <p className="text-xs text-rose-600 font-medium px-1">{error}</p>
+        )}
         <button
           type="submit"
-          disabled={!message.trim() || sent}
+          disabled={!message.trim() || sending || sent}
           className={`w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-bold transition-all disabled:opacity-40 ${
             sent
               ? 'border border-emerald-300 bg-emerald-50 text-emerald-700'
@@ -91,7 +112,9 @@ function ContactForm() {
           }`}
         >
           {sent ? (
-            <><Check className="w-4 h-4" /> Merci, votre messagerie s'est ouverte !</>
+            <><Check className="w-4 h-4" /> Message envoyé, merci !</>
+          ) : sending ? (
+            <><RefreshCw className="w-3.5 h-3.5 animate-spin" /> Envoi en cours…</>
           ) : (
             <><Send className="w-3.5 h-3.5" /> Envoyer</>
           )}
