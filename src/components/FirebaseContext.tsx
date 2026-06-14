@@ -42,7 +42,8 @@ interface FirebaseContextType {
   teamName: string | null;
   isSyncing: boolean;
   currentUserRole: UserRole | null;
-  
+  googleRedirectPending: boolean;
+
   signInWithGoogle: () => Promise<void>;
   signInWithEmail: (email: string, password: string) => Promise<void>;
   signUpWithEmail: (email: string, password: string, displayName: string) => Promise<void>;
@@ -86,6 +87,9 @@ export function FirebaseProvider({
   const [isSyncing, setIsSyncing] = useState(false);
   const [currentUserRole, setCurrentUserRole] = useState<UserRole | null>(null);
   const [isNewUser, setIsNewUser] = useState(false);
+  const [googleRedirectPending, setGoogleRedirectPending] = useState(
+    () => !!sessionStorage.getItem('google_redirect_pending')
+  );
 
   // 1. Mandatory Core Constraint: test the connection upon boot using doc get from server
   useEffect(() => {
@@ -105,12 +109,12 @@ export function FirebaseProvider({
   // 2. Recover result after Google redirect sign-in
   useEffect(() => {
     getRedirectResult(auth)
-      .then((result) => {
-        if (result) sessionStorage.removeItem('google_redirect_pending');
-      })
       .catch((err) => {
         console.error('Google redirect sign-in failed:', err);
+      })
+      .finally(() => {
         sessionStorage.removeItem('google_redirect_pending');
+        setGoogleRedirectPending(false);
       });
   }, []);
 
@@ -511,6 +515,7 @@ export function FirebaseProvider({
       teamName,
       isSyncing,
       currentUserRole,
+      googleRedirectPending,
       signInWithGoogle,
       signInWithEmail,
       signUpWithEmail,

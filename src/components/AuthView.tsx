@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useAuth } from './FirebaseContext';
 import { Coffee, Mail, Lock, User, LogIn, ChevronRight, AlertCircle, RefreshCw } from 'lucide-react';
 
@@ -7,7 +7,7 @@ interface AuthViewProps {
 }
 
 export function AuthView({ onClose }: AuthViewProps) {
-  const { signInWithGoogle, signInWithEmail, signUpWithEmail } = useAuth();
+  const { signInWithGoogle, signInWithEmail, signUpWithEmail, googleRedirectPending } = useAuth();
   
   const [isSignUp, setIsSignUp] = useState(false);
   const [email, setEmail] = useState('');
@@ -15,14 +15,7 @@ export function AuthView({ onClose }: AuthViewProps) {
   const [name, setName] = useState('');
   
   const [loading, setLoading] = useState(false);
-  const [googleRedirectPending, setGoogleRedirectPending] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (sessionStorage.getItem('google_redirect_pending')) {
-      setGoogleRedirectPending(true);
-    }
-  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
