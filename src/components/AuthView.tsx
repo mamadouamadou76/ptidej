@@ -82,16 +82,6 @@ export function AuthView({ onClose }: AuthViewProps) {
     <div className="flex-1 flex flex-col justify-center items-center px-6 py-8 overflow-y-auto bg-stone-50/50">
       <div className="w-full max-w-sm bg-white rounded-3xl border border-stone-200/80 p-6 md:p-8 shadow-xl space-y-6 relative">
         
-        {/* Skip option */}
-        {onClose && (
-          <button 
-            onClick={onClose}
-            className="absolute top-4 right-4 text-xs font-mono font-bold text-stone-400 hover:text-stone-700 px-2 py-1 rounded"
-          >
-            [ Passer ]
-          </button>
-        )}
-
         {/* Brand identity */}
         <div className="text-center space-y-2">
           <div className="inline-flex bg-amber-500 text-white p-3 rounded-2xl shadow-md transform hover:rotate-12 transition-transform duration-300">
