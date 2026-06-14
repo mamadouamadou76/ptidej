@@ -3,6 +3,7 @@ import {
   User,
   signInWithRedirect,
   getRedirectResult,
+  browserPopupRedirectResolver,
   GoogleAuthProvider,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
@@ -129,7 +130,7 @@ export function FirebaseProvider({
 
     console.log('🔄 Checking redirect result...');
 
-    getRedirectResult(auth)
+    getRedirectResult(auth, browserPopupRedirectResolver)
       .then((result) => {
         console.log('✅ Redirect result:', result);
         if (result?.user) redirectSucceeded = true;
@@ -296,7 +297,7 @@ export function FirebaseProvider({
     const provider = new GoogleAuthProvider();
     try {
       sessionStorage.setItem('google_redirect_pending', 'true');
-      await signInWithRedirect(auth, provider);
+      await signInWithRedirect(auth, provider, browserPopupRedirectResolver);
     } catch (err) {
       sessionStorage.removeItem('google_redirect_pending');
       console.error('Google Sign-In Failed:', err);
