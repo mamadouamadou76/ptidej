@@ -23,7 +23,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      sender: { name: "P'tit Déj — Formulaire", email: 'noreply@ptidej.fr' },
+      sender: { name: "P'tit Déj — Formulaire", email: 'mamadouamadou76@gmail.com' },
       to: [{ email: 'mamadouamadou76@gmail.com', name: 'Mamadou' }],
       subject: `${type ?? 'Message'} — P'tit Déj`,
       textContent: message.trim(),
