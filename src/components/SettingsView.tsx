@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { ShiftSettings } from '../types';
 import {
   Calendar, RotateCcw, Check, RefreshCw, AlertTriangle,
-  HelpCircle, Sparkles, Clock, Hammer, Clipboard
+  HelpCircle, Sparkles, Clock, Hammer, Clipboard, Mail, Bug
 } from 'lucide-react';
 import { getMonday, formatLocalDate, getISOWeekNumber } from '../utils/scheduler';
 
@@ -337,6 +337,33 @@ export function SettingsView({
             Sur <strong>iPhone</strong> (Safari) : Bouton <strong>Partager</strong> en bas, puis tapotez <strong>"Sur l'écran d'accueil"</strong>.<br/>
             Sur <strong>Android</strong> : Menu Chromes (les 3 points), puis <strong>"Ajouter à l'écran d'accueil"</strong>.
           </p>
+        </div>
+      </div>
+
+      {/* Contact & Bug Report */}
+      <div className="bg-white border border-stone-200/80 p-4 rounded-2xl shadow-xs space-y-3">
+        <h3 className="font-bold text-stone-900 text-sm flex items-center gap-2">
+          <Mail className="w-4 h-4 text-amber-600" />
+          <span>Nous contacter</span>
+        </h3>
+        <p className="text-xs text-stone-500 leading-relaxed">
+          Une idée d'amélioration, un bug à signaler ou une question ? Envoyez-nous un message directement.
+        </p>
+        <div className="space-y-2 pt-1">
+          <a
+            href="mailto:mamadouamadou76@gmail.com?subject=P%27tit%20D%C3%A9j%20%E2%80%94%20Signalement%20de%20bug&body=D%C3%A9crivez%20le%20probl%C3%A8me%20rencontr%C3%A9%20%3A%0A%0A"
+            className="w-full flex items-center justify-center gap-2 py-2.5 border border-rose-200 hover:border-rose-400 text-rose-700 hover:text-rose-900 bg-rose-50/30 hover:bg-rose-50/60 rounded-xl text-xs font-bold transition-all"
+          >
+            <Bug className="w-4 h-4 text-rose-500" />
+            <span>Signaler un bug</span>
+          </a>
+          <a
+            href="mailto:mamadouamadou76@gmail.com?subject=P%27tit%20D%C3%A9j%20%E2%80%94%20Suggestion&body=Votre%20message%20%3A%0A%0A"
+            className="w-full flex items-center justify-center gap-2 py-2.5 border border-amber-200 hover:border-amber-400 text-amber-800 hover:text-amber-900 bg-amber-50/30 hover:bg-amber-50/60 rounded-xl text-xs font-bold transition-all"
+          >
+            <Mail className="w-4 h-4 text-amber-600" />
+            <span>Envoyer un message</span>
+          </a>
         </div>
       </div>
 
