@@ -1,4 +1,4 @@
-const CACHE_NAME = 'breakfast-planner-v2';
+const CACHE_NAME = 'breakfast-planner-v3';
 const STATIC_ASSETS = [
   '/manifest.json'
 ];
@@ -28,7 +28,13 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
-  // Network-first for HTML navigation: always fetch latest index.html from server
+  // Skip cross-origin requests — the SW cannot cache them reliably
+  // and returning null to respondWith() throws TypeError
+  if (!event.request.url.startsWith(self.location.origin)) {
+    return;
+  }
+
+  // Network-first for HTML navigation: always fetch latest index.html
   if (event.request.mode === 'navigate') {
     event.respondWith(
       fetch(event.request).catch(() => caches.match('/index.html'))
@@ -36,13 +42,15 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Cache-first for static assets (JS/CSS filenames include content hashes)
+  // Cache-first for same-origin static assets (hashed filenames)
   event.respondWith(
     caches.match(event.request).then((cachedResponse) => {
       if (cachedResponse) {
         return cachedResponse;
       }
-      return fetch(event.request).catch(() => null);
+      return fetch(event.request).catch(() =>
+        new Response('', { status: 408, statusText: 'Network request failed' })
+      );
     })
   );
 });
