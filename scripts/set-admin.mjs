@@ -14,7 +14,8 @@
  *   node scripts/set-admin.mjs mamadouamadou76@gmail.com
  */
 
-import admin from 'firebase-admin';
+import { initializeApp, cert } from 'firebase-admin/app';
+import { getAuth } from 'firebase-admin/auth';
 import { readFileSync, existsSync } from 'fs';
 import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
@@ -33,10 +34,11 @@ let credential;
 const localKeyPath = resolve(__dirname, 'serviceAccountKey.json');
 
 if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
-  credential = admin.credential.applicationDefault();
+  const { applicationDefault } = await import('firebase-admin/app');
+  credential = applicationDefault();
 } else if (existsSync(localKeyPath)) {
   const serviceAccount = JSON.parse(readFileSync(localKeyPath, 'utf8'));
-  credential = admin.credential.cert(serviceAccount);
+  credential = cert(serviceAccount);
 } else {
   console.error([
     '',
@@ -55,11 +57,12 @@ if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
   process.exit(1);
 }
 
-admin.initializeApp({ credential, projectId: PROJECT_ID });
+initializeApp({ credential, projectId: PROJECT_ID });
 
 try {
-  const user = await admin.auth().getUserByEmail(email);
-  await admin.auth().setCustomUserClaims(user.uid, { admin: true });
+  const auth = getAuth();
+  const user = await auth.getUserByEmail(email);
+  await auth.setCustomUserClaims(user.uid, { admin: true });
   console.log(`✓ Claim { admin: true } attribué à ${email} (uid : ${user.uid})`);
   console.log('  L\'utilisateur doit se reconnecter pour que le claim soit actif dans son token.');
 } catch (err) {
