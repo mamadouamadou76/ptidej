@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { CalendarDay, Colleague } from '../types';
 import { getColors } from '../utils/colorMapper';
 import { getISOWeekNumber } from '../utils/scheduler';
-import { Coffee, CalendarOff, RefreshCw, History, Calendar, Pencil } from 'lucide-react';
+import { Coffee, CalendarOff, RefreshCw, History, Calendar, Pencil, HelpCircle } from 'lucide-react';
 
 interface DesktopPlanningViewProps {
   schedule: CalendarDay[];
@@ -13,6 +13,10 @@ interface DesktopPlanningViewProps {
   numberOfWeeks: number;
   coApporteurs: Record<string, string>;
   setCoApporteurs: React.Dispatch<React.SetStateAction<Record<string, string>>>;
+  autoRecalculate: boolean;
+  onToggleAutoRecalculate: (value: boolean) => void;
+  pendingRecalculate: boolean;
+  onForceRecalculate: () => void;
   currentUserRole: 'admin' | 'member' | 'viewer' | null;
   userDisplayName: string | null;
 }
@@ -26,12 +30,17 @@ export function DesktopPlanningView({
   numberOfWeeks,
   coApporteurs,
   setCoApporteurs,
+  autoRecalculate,
+  onToggleAutoRecalculate,
+  pendingRecalculate,
+  onForceRecalculate,
   currentUserRole,
   userDisplayName,
 }: DesktopPlanningViewProps) {
   const [editingDate, setEditingDate] = useState<string | null>(null);
   const [showPast, setShowPast] = useState(false);
   const [correctionMode, setCorrectionMode] = useState(false);
+  const [showCorrectionInfo, setShowCorrectionInfo] = useState(false);
 
   const canEditDay = (day: { colleagueName?: string | null }): boolean => {
     if (!currentUserRole || currentUserRole === 'admin') return true;
@@ -89,23 +98,70 @@ export function DesktopPlanningView({
   return (
     <div className="flex-1 flex flex-col overflow-auto bg-stone-50">
       {/* Barre d'action */}
-      <div className="flex items-center justify-between px-6 py-3 border-b border-stone-200 bg-white">
-        <p className="text-xs text-stone-500">
-          {currentAndFutureWeeks.length} semaine{currentAndFutureWeeks.length > 1 ? 's' : ''} à venir
-          {pastWeeks.length > 0 && ` · ${pastWeeks.length} semaine${pastWeeks.length > 1 ? 's' : ''} passée${pastWeeks.length > 1 ? 's' : ''}`}
-        </p>
+      <div className="flex items-center justify-between px-6 py-3 border-b border-stone-200 bg-white gap-4 flex-wrap">
+        <div>
+          <p className="text-xs text-stone-500">
+            {currentAndFutureWeeks.length} semaine{currentAndFutureWeeks.length > 1 ? 's' : ''} à venir
+            {pastWeeks.length > 0 && ` · ${pastWeeks.length} semaine${pastWeeks.length > 1 ? 's' : ''} passée${pastWeeks.length > 1 ? 's' : ''}`}
+          </p>
+          <div className="flex items-center gap-2 mt-1">
+            <span className="text-[10px] text-stone-500 font-medium">Recalcul auto</span>
+            <button
+              onClick={() => onToggleAutoRecalculate(!autoRecalculate)}
+              className={`relative inline-flex h-4 w-8 items-center rounded-full transition-colors flex-shrink-0 ${
+                autoRecalculate ? 'bg-amber-500' : 'bg-stone-300'
+              }`}
+            >
+              <span
+                className={`inline-block h-3 w-3 transform rounded-full bg-white shadow-sm transition-transform ${
+                  autoRecalculate ? 'translate-x-4' : 'translate-x-0.5'
+                }`}
+              />
+            </button>
+            {!autoRecalculate && pendingRecalculate && (
+              <button
+                onClick={onForceRecalculate}
+                className="flex items-center gap-1 px-2.5 py-1 text-[10px] font-bold rounded-lg bg-orange-500 text-white hover:bg-orange-600 active:scale-95 transition-all"
+              >
+                <RefreshCw className="w-3 h-3" />
+                Recalculer maintenant
+              </button>
+            )}
+          </div>
+        </div>
+
         <div className="flex items-center gap-2">
-          <button
-            onClick={() => setCorrectionMode(!correctionMode)}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold border transition-all ${
-              correctionMode
-                ? 'bg-amber-600 text-white border-amber-700'
-                : 'bg-white text-stone-600 border-stone-200 hover:border-stone-400'
-            }`}
-          >
-            <Pencil className="w-3.5 h-3.5" />
-            {correctionMode ? 'Correction ON' : 'Mode correction'}
-          </button>
+          <div className="relative flex items-center gap-1">
+            <button
+              onClick={() => setCorrectionMode(!correctionMode)}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold border transition-all ${
+                correctionMode
+                  ? 'bg-amber-600 text-white border-amber-700'
+                  : 'bg-white text-stone-600 border-stone-200 hover:border-stone-400'
+              }`}
+            >
+              <Pencil className="w-3.5 h-3.5" />
+              {correctionMode ? 'Correction ON' : 'Mode correction'}
+            </button>
+            <button
+              onClick={() => setShowCorrectionInfo(!showCorrectionInfo)}
+              className="text-stone-400 hover:text-stone-600 p-1 rounded-full transition-colors"
+              title="Qu'est-ce que le mode correction ?"
+            >
+              <HelpCircle className="w-4 h-4" />
+            </button>
+            {showCorrectionInfo && (
+              <div className="absolute top-full right-0 mt-2 w-64 bg-white border border-stone-200 rounded-xl shadow-lg p-3 z-50 text-left">
+                <div className="flex justify-between items-start mb-1.5">
+                  <p className="text-[10px] font-bold text-stone-700 uppercase tracking-wide">Mode correction</p>
+                  <button onClick={() => setShowCorrectionInfo(false)} className="text-stone-400 hover:text-stone-600 text-xs">✕</button>
+                </div>
+                <p className="text-xs text-stone-600 leading-relaxed">
+                  🔒 Par défaut, les jours déjà passés sont verrouillés pour éviter les erreurs. Active ce mode pour les rendre modifiables et corriger qui était de service un jour donné.
+                </p>
+              </div>
+            )}
+          </div>
           {pastWeeks.length > 0 && (
             <button
               onClick={() => setShowPast(!showPast)}

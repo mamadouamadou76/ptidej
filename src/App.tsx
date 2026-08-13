@@ -558,6 +558,10 @@ Planning généré le ${dateAujourdhui} via P'tit Déj Matinal 🥐`;
                       numberOfWeeks={settings.numberOfWeeks}
                       coApporteurs={coApporteurs}
                       setCoApporteurs={setCoApporteurs}
+                      autoRecalculate={autoRecalculate}
+                      onToggleAutoRecalculate={setAutoRecalculate}
+                      pendingRecalculate={pendingRecalculate}
+                      onForceRecalculate={handleForceRecalculate}
                       currentUserRole={currentUserRole}
                       userDisplayName={profile?.displayName || null}
                     />

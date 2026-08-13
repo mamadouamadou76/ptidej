@@ -4,7 +4,7 @@ import { getColors } from '../utils/colorMapper';
 import { getISOWeekNumber } from '../utils/scheduler';
 import {
   Coffee, Share2, Check, AlertTriangle, ChevronDown, RefreshCw,
-  CalendarOff
+  CalendarOff, Pencil, HelpCircle
 } from 'lucide-react';
 
 interface PlanningViewProps {
@@ -45,6 +45,8 @@ export function PlanningView({
   const [editingDate, setEditingDate] = useState<string | null>(null);
   const [copiedText, setCopiedText] = useState(false);
   const [collapsedWeeks, setCollapsedWeeks] = useState<Set<number>>(new Set());
+  const [correctionMode, setCorrectionMode] = useState(false);
+  const [showCorrectionInfo, setShowCorrectionInfo] = useState(false);
 
   const toggleWeek = (wIdx: number) => {
     setCollapsedWeeks(prev => {
@@ -59,6 +61,16 @@ export function PlanningView({
     if (!currentUserRole || currentUserRole === 'admin') return true;
     if (currentUserRole === 'viewer') return false;
     return day.colleagueName === userDisplayName;
+  };
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const todayStr = today.toISOString().split('T')[0];
+
+  const canEditDayNow = (day: { dateString: string; colleagueName?: string | null }): boolean => {
+    const isDayPast = day.dateString < todayStr;
+    if (isDayPast && !correctionMode) return false;
+    return canEditDay(day);
   };
 
   // Group schedule by weekIndex, keep only morning-shift weeks
@@ -114,7 +126,38 @@ export function PlanningView({
           </div>
         </div>
 
-        <div className="flex gap-2">
+        <div className="flex gap-2 items-center">
+          <div className="relative flex items-center gap-1">
+            <button
+              onClick={() => setCorrectionMode(!correctionMode)}
+              className={`flex items-center gap-1.5 px-2.5 py-2 rounded-xl text-xs font-bold border transition-all ${
+                correctionMode
+                  ? 'bg-amber-600 text-white border-amber-700'
+                  : 'bg-white text-stone-600 border-stone-200 hover:border-stone-400'
+              }`}
+            >
+              <Pencil className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">{correctionMode ? 'Correction ON' : 'Mode correction'}</span>
+            </button>
+            <button
+              onClick={() => setShowCorrectionInfo(!showCorrectionInfo)}
+              className="text-stone-400 hover:text-stone-600 p-1 rounded-full transition-colors"
+              title="Qu'est-ce que le mode correction ?"
+            >
+              <HelpCircle className="w-4 h-4" />
+            </button>
+            {showCorrectionInfo && (
+              <div className="absolute top-full right-0 mt-2 w-60 bg-white border border-stone-200 rounded-xl shadow-lg p-3 z-50 text-left">
+                <div className="flex justify-between items-start mb-1.5">
+                  <p className="text-[10px] font-bold text-stone-700 uppercase tracking-wide">Mode correction</p>
+                  <button onClick={() => setShowCorrectionInfo(false)} className="text-stone-400 hover:text-stone-600 text-xs">✕</button>
+                </div>
+                <p className="text-xs text-stone-600 leading-relaxed">
+                  🔒 Par défaut, les jours déjà passés sont verrouillés pour éviter les erreurs. Active ce mode pour les rendre modifiables et corriger qui était de service un jour donné.
+                </p>
+              </div>
+            )}
+          </div>
           <button
             id="btn-copy-summary"
             onClick={() => {
@@ -216,7 +259,7 @@ export function PlanningView({
 
                           {/* Assignee + co-apporteur */}
                           <div className="flex flex-col items-end gap-1">
-                            {canEditDay(day) ? (
+                            {canEditDayNow(day) ? (
                               day.colleagueId ? (
                                 <button
                                   id={`btn-edit-day-${day.dateString}`}
@@ -269,7 +312,7 @@ export function PlanningView({
                         </div>
 
                           {/* Override Selector Panel (displays below when clicked) */}
-                          {isEditing && canEditDay(day) && (
+                          {isEditing && canEditDayNow(day) && (
                             <div className="bg-stone-50/80 border border-stone-200 rounded-xl p-3 space-y-2 text-xs">
                               <div className="flex justify-between items-center pb-1 border-b border-stone-150">
                                 <span className="font-bold text-stone-700 text-[10px] uppercase tracking-wider">
