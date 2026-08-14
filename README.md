@@ -45,3 +45,7 @@ Les tests couvrent l'algorithme de planning et la validation du formulaire de co
 Le code d'équipe agit comme un secret de partage. Les collègues, absences et membres sont limités aux utilisateurs autorisés par les règles Firestore. Un nouveau membre rejoint toujours avec le rôle `viewer`; seul le propriétaire peut modifier les rôles et le planning.
 
 Ne placez jamais de clé Firebase Admin, Brevo ou autre secret serveur dans une variable `VITE_*` ou dans le dépôt.
+
+## Reprise du projet
+
+Lire `HANDOFF.md` avant toute évolution : il récapitule l'architecture courante, les dernières décisions, les limites connues et les prochaines priorités. Les agents Claude doivent également suivre `CLAUDE.md` et maintenir le handoff dans le même commit que chaque changement significatif.
