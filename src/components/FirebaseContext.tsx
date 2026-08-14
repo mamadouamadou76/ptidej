@@ -17,7 +17,6 @@ import {
   updateDoc,
   collection,
   onSnapshot,
-  increment
 } from 'firebase/firestore';
 import { auth, db, OperationType, handleFirestoreError } from '../utils/firebase';
 import { Colleague, Absence, ShiftSettings, ManualOverride } from '../types';
@@ -124,7 +123,6 @@ export function FirebaseProvider({
     
     try {
       const profileDoc = await getDoc(doc(db, profilePath));
-      const isFirstLogin = !profileDoc.exists();
       let currentActiveTeam = '';
 
       if (!profileDoc.exists()) {
@@ -150,11 +148,6 @@ export function FirebaseProvider({
         currentActiveTeam = data.activeTeamId || '';
         setIsNewUser(false);
       }
-
-      // Track daily connexions (fire-and-forget)
-      const today = new Date().toISOString().slice(0, 10);
-      const statsPayload = { connexions: increment(1), ...(isFirstLogin ? { nouveaux: increment(1) } : {}) };
-      setDoc(doc(db, 'stats', today), statsPayload, { merge: true }).catch(() => {});
 
       setActiveTeamId(currentActiveTeam);
 
@@ -291,8 +284,10 @@ export function FirebaseProvider({
   ) => {
     if (!user) throw new Error("Veuillez vous authentifier d'abord.");
     
-    // Generate a beautiful, clean 6 character code
-    const generatedTeamId = `team-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
+    // Generate a cryptographically random 8-character sharing code.
+    const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    const random = crypto.getRandomValues(new Uint8Array(8));
+    const generatedTeamId = `team-${Array.from(random, value => alphabet[value % alphabet.length]).join('')}`;
     const p = `teams/${generatedTeamId}`;
     
     try {
@@ -350,10 +345,6 @@ export function FirebaseProvider({
     const formattedId = normalized;
     
     const teamDocPath = `teams/${formattedId}`;
-
-    // Confirm which Firestore instance is used (debug)
-    console.log('[joinTeam] db databaseId:', (db as any)._databaseId?.database ?? '(default)');
-    console.log('[joinTeam] target doc:', teamDocPath, '| user:', user.uid);
 
     // 1. Verify team exists
     const docSnap = await getDoc(doc(db, teamDocPath))

@@ -92,9 +92,11 @@ function ContactForm() {
             ? 'Décrivez le problème rencontré, les étapes pour le reproduire…'
             : 'Votre suggestion, question ou retour…'}
           rows={4}
+          maxLength={4000}
           disabled={sending || sent}
           className="w-full px-3.5 py-2.5 bg-stone-50 border border-stone-200 rounded-xl text-xs text-stone-900 placeholder-stone-400 focus:outline-none focus:ring-1 focus:ring-amber-500 focus:bg-white resize-none transition-all disabled:opacity-50"
         />
+        <p className="px-1 text-right text-[10px] text-stone-400">{message.length}/4000</p>
         {error && (
           <p className="text-xs text-rose-600 font-medium px-1">{error}</p>
         )}

@@ -1,4 +1,4 @@
-import { Colleague, Absence, ShiftSettings, CalendarDay, ManualOverride } from '../types';
+import type { Colleague, Absence, ShiftSettings, CalendarDay, ManualOverride } from '../types.ts';
 
 /**
  * Parses a YYYY-MM-DD string into a local Date object at midnight.
@@ -71,6 +71,9 @@ export function generateSchedule(
   const calendar: CalendarDay[] = [];
   const startMonday = parseLocalDate(settings.startWeekDate);
   const totalDays = settings.numberOfWeeks * 7;
+  const colleagueIndexes = new Map(colleagues.map((colleague, index) => [colleague.id, index]));
+  const assignmentCounts = new Map(colleagues.map(colleague => [colleague.id, colleague.initialCount]));
+  const lastAssignments = new Map(colleagues.map(colleague => [colleague.id, -1]));
 
   // We generate totalDays
   for (let i = 0; i < totalDays; i++) {
@@ -133,23 +136,11 @@ export function generateSchedule(
       } else {
         // Calculate the score (duty counts) for each candidate prior to this date
         // Score = initialCount + number of assignments in calendar so far
-        const candidateScores = availableColleagues.map((c) => {
-          let count = c.initialCount;
-          let lastPosition = -1;
-
-          for (let j = 0; j < i; j++) {
-            if (calendar[j].colleagueId === c.id) {
-              count++;
-              lastPosition = j; // Update with the latest day index they were assigned
-            }
-          }
-
-          return {
-            colleague: c,
-            score: count,
-            lastPosition,
-          };
-        });
+        const candidateScores = availableColleagues.map((colleague) => ({
+          colleague,
+          score: assignmentCounts.get(colleague.id) ?? colleague.initialCount,
+          lastPosition: lastAssignments.get(colleague.id) ?? -1,
+        }));
 
         // We want to sort candidates to pick the best one:
         // - Primary sort: Lowest score (fairest distribution)
@@ -163,8 +154,8 @@ export function generateSchedule(
             return a.lastPosition - b.lastPosition;
           }
           // Fallback to preserve a stable index order
-          const indexA = colleagues.findIndex((col) => col.id === a.colleague.id);
-          const indexB = colleagues.findIndex((col) => col.id === b.colleague.id);
+          const indexA = colleagueIndexes.get(a.colleague.id) ?? 0;
+          const indexB = colleagueIndexes.get(b.colleague.id) ?? 0;
           return indexA - indexB;
         });
 
@@ -174,6 +165,8 @@ export function generateSchedule(
 
     // Attach extra metadata for UI rendering
     if (day.colleagueId) {
+      assignmentCounts.set(day.colleagueId, (assignmentCounts.get(day.colleagueId) ?? 0) + 1);
+      lastAssignments.set(day.colleagueId, i);
       const coll = colleagues.find((c) => c.id === day.colleagueId);
       if (coll) {
         day.colleagueName = coll.name;

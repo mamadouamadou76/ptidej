@@ -14,9 +14,23 @@ service cloud.firestore {
       return isSignedIn() && request.auth.uid == userId;
     }
 
+    function isPlatformAdmin() {
+      return isSignedIn() && request.auth.token.admin == true;
+    }
+
+    function isTeamOwner(teamId) {
+      return isSignedIn()
+        && get(/databases/$(database)/documents/teams/$(teamId)).data.ownerId == request.auth.uid;
+    }
+
+    function isTeamMember(teamId) {
+      return isSignedIn()
+        && exists(/databases/$(database)/documents/teams/$(teamId)/members/$(request.auth.uid));
+    }
+
     // Users
     match /users/{userId}/public/profile {
-      allow read: if isSignedIn();
+      allow read: if isOwner(userId) || isPlatformAdmin();
       allow create, update: if isOwner(userId);
       allow delete: if isOwner(userId);
     }
@@ -27,40 +41,41 @@ service cloud.firestore {
 
     // Teams
     match /teams/{teamId} {
+      // A signed-in user may resolve a shared team code. Team data and
+      // subcollections become readable only after membership is created.
       allow get: if isSignedIn();
-      allow list: if isSignedIn() && (
-        resource.data.ownerId == request.auth.uid
-        || request.auth.token.admin == true
-      );
+      allow list: if isPlatformAdmin();
       allow create: if isSignedIn() && request.resource.data.ownerId == request.auth.uid;
-      allow update: if isSignedIn() && resource.data.ownerId == request.auth.uid;
-      allow delete: if isSignedIn() && resource.data.ownerId == request.auth.uid;
+      allow update: if isTeamOwner(teamId)
+        && request.resource.data.ownerId == resource.data.ownerId;
+      allow delete: if isTeamOwner(teamId);
     }
 
     // Colleagues
     match /teams/{teamId}/colleagues/{colleagueId} {
-      allow read, list: if isSignedIn();
-      allow create, update, delete: if isSignedIn()
-        && get(/databases/$(database)/documents/teams/$(teamId)).data.ownerId == request.auth.uid;
+      allow read, list: if isTeamMember(teamId) || isTeamOwner(teamId) || isPlatformAdmin();
+      allow create, update, delete: if isTeamOwner(teamId);
     }
 
     // Absences
     match /teams/{teamId}/absences/{absenceId} {
-      allow read, list: if isSignedIn();
-      allow create, update, delete: if isSignedIn()
-        && get(/databases/$(database)/documents/teams/$(teamId)).data.ownerId == request.auth.uid;
+      allow read, list: if isTeamMember(teamId) || isTeamOwner(teamId) || isPlatformAdmin();
+      allow create, update, delete: if isTeamOwner(teamId);
     }
 
     // Members
     match /teams/{teamId}/members/{memberId} {
-      allow read, list: if isSignedIn();
+      allow read: if memberId == request.auth.uid || isTeamOwner(teamId) || isPlatformAdmin();
+      allow list: if isTeamOwner(teamId) || isPlatformAdmin();
       // Team owner manages all members; any signed-in user can create their own entry (self-join)
-      allow create: if isSignedIn() && (
-        get(/databases/$(database)/documents/teams/$(teamId)).data.ownerId == request.auth.uid
-        || memberId == request.auth.uid
+      allow create: if isTeamOwner(teamId) || (
+        isSignedIn()
+        && memberId == request.auth.uid
+        && request.resource.data.userId == request.auth.uid
+        && request.resource.data.role == 'viewer'
+        && request.resource.data.keys().hasOnly(['userId', 'displayName', 'email', 'role', 'joinedAt'])
       );
-      allow update, delete: if isSignedIn()
-        && get(/databases/$(database)/documents/teams/$(teamId)).data.ownerId == request.auth.uid;
+      allow update, delete: if isTeamOwner(teamId);
     }
 
     // CMS
@@ -72,7 +87,7 @@ service cloud.firestore {
     // Stats (connexions & new users per day)
     match /stats/{date} {
       allow read: if request.auth != null && request.auth.token.admin == true;
-      allow create, update: if isSignedIn();
+      allow create, update: if false;
     }
 
     // Admin collectionGroup access

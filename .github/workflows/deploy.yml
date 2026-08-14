@@ -14,6 +14,8 @@ jobs:
         with:
           node-version: '22'
       - run: npm ci
+      - run: npm run lint
+      - run: npm test
       - run: npm run build
       - run: npm install -g firebase-tools
-      - run: firebase deploy --only hosting:ptidej-f26a2 --project ptidej-f26a2 --token ${{ secrets.FIREBASE_TOKEN }}
+      - run: firebase deploy --only hosting:ptidej-f26a2,firestore:rules --project ptidej-f26a2 --token ${{ secrets.FIREBASE_TOKEN }}

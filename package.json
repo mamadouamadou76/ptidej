@@ -1,11 +1,12 @@
 {
-  "name": "react-example",
+  "name": "ptidej-planning",
   "private": true,
   "version": "0.0.0",
   "type": "module",
   "scripts": {
     "dev": "vite --port=3000 --host=0.0.0.0",
     "build": "vite build",
+    "test": "node --experimental-strip-types --test src/utils/scheduler.test.ts api/contactValidation.test.ts",
     "preview": "vite preview",
     "clean": "rm -rf dist server.js",
     "lint": "tsc --noEmit"

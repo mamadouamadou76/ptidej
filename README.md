@@ -1,20 +1,47 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://ai.google.dev/static/site-assets/images/share-ais-513315318.png" />
-</div>
+# P'tit Déj
 
-# Run and deploy your AI Studio app
+Application collaborative de planification des petits-déjeuners d'équipe. Elle répartit les tours équitablement, tient compte des absences et permet aux administrateurs de corriger manuellement le planning.
 
-This contains everything you need to run your app locally.
+## Fonctionnalités
 
-View your app in AI Studio: https://ai.studio/apps/fce779ca-3f99-4909-b744-79951a23f490
+- planning configurable sur plusieurs semaines ;
+- répartition automatique et compteur d'équité ;
+- absences et corrections manuelles ;
+- équipes partagées avec rôles `admin`, `member` et `viewer` ;
+- synchronisation temps réel avec Firebase ;
+- interfaces mobile et desktop ;
+- export du planning et installation PWA ;
+- tableau de bord réservé aux super-administrateurs.
 
-## Run Locally
+## Développement local
 
-**Prerequisites:**  Node.js
+Prérequis : Node.js 22.
 
+```bash
+npm ci
+npm run dev
+```
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+L'application utilise la configuration publique Firebase de `firebase-applet-config.json`. La clé Brevo reste exclusivement côté serveur : renseignez `BREVO_API_KEY` dans l'environnement de l'hébergeur.
+
+## Vérifications
+
+```bash
+npm run lint
+npm test
+npm run build
+```
+
+Les tests couvrent l'algorithme de planning et la validation du formulaire de contact. Les scénarios manuels complémentaires sont décrits dans `TEST_GUIDE.md`.
+
+## Déploiement
+
+- Firebase Hosting sert l'application statique et déploie `firestore.rules` via GitHub Actions.
+- `api/contact.ts` nécessite un hébergement compatible avec les fonctions Vercel et la variable `BREVO_API_KEY`.
+- La limitation de fréquence du formulaire est locale à chaque instance serveur. Une protection distribuée forte nécessitera un stockage partagé ou un CAPTCHA.
+
+## Sécurité des équipes
+
+Le code d'équipe agit comme un secret de partage. Les collègues, absences et membres sont limités aux utilisateurs autorisés par les règles Firestore. Un nouveau membre rejoint toujours avec le rôle `viewer`; seul le propriétaire peut modifier les rôles et le planning.
+
+Ne placez jamais de clé Firebase Admin, Brevo ou autre secret serveur dans une variable `VITE_*` ou dans le dépôt.

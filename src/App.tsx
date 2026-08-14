@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Colleague, Absence, ShiftSettings, ManualOverride, CalendarDay } from './types';
 import { MobileFrame } from './components/MobileFrame';
 import { PlanningView } from './components/PlanningView';
@@ -16,7 +16,8 @@ import { TeamMgmtView } from './components/TeamMgmtView';
 import { FirebaseProvider, useAuth } from './components/FirebaseContext';
 import { AdminProvider } from './components/AdminContext';
 import { AdminDashboard } from './components/AdminDashboard';
-import { generateSchedule, computeStats, getISOWeekNumber } from './utils/scheduler';
+import { computeStats, formatLocalDate, getISOWeekNumber } from './utils/scheduler';
+import { useScheduleCalculation } from './hooks/useScheduleCalculation';
 import { getInitialDemoData } from './utils/demoData';
 import {
   Coffee, Calendar, Users, Settings, Cloud, CloudOff,
@@ -99,7 +100,6 @@ function AppContent({
 
   const [autoRecalculate, setAutoRecalculate] = useState(true);
   const [pendingRecalculate, setPendingRecalculate] = useState(false);
-  const cachedScheduleRef = useRef<CalendarDay[]>([]);
 
   // Mark pending when data changes while auto-recalc is disabled
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -129,6 +129,10 @@ function AppContent({
     addAbsenceInDB,
     deleteAbsenceInDB
   } = useAuth();
+
+  const { schedule, forceRecalculate } = useScheduleCalculation(
+    colleagues, absences, settings, overrides, autoRecalculate,
+  );
 
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [showTeamPanel, setShowTeamPanel] = useState(false);
@@ -319,14 +323,9 @@ function AppContent({
   }
 
   const handleForceRecalculate = () => {
-    cachedScheduleRef.current = generateSchedule(colleagues, absences, settings, overrides);
+    forceRecalculate();
     setPendingRecalculate(false);
   };
-
-  if (autoRecalculate) {
-    cachedScheduleRef.current = generateSchedule(colleagues, absences, settings, overrides);
-  }
-  const schedule = cachedScheduleRef.current;
   const stats = computeStats(colleagues, schedule);
   const needsTeamSetup = user && !activeTeamId;
 
@@ -339,7 +338,7 @@ function AppContent({
 
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    const todayStr = today.toISOString().split('T')[0];
+    const todayStr = formatLocalDate(today);
 
     const DAY_FULL: Record<number, string> = {
       1: 'Lundi', 2: 'Mardi', 3: 'Mercredi',
